@@ -1,0 +1,73 @@
+/* frontend/src/index.css */
+
+:root {
+  /* NOWE KOLORY Z TWOJEJ PALETY */
+  --dark-bg: #091413;        /* Najciemniejszy zielony (Tło strony) */
+  --card-bg: #285A48;        /* Ciemny zielony (Karty i formularze) */
+  --accent-cyan: #408A71;    /* Średni zielony (Przyciski i akcenty) */
+  --accent-hover: #B0E4CC;   /* Jasny miętowy (Najechanie myszką i tytuły) */
+  
+  --text-main: #FFFFFF;      
+  --text-sub: #B0E4CC;       /* Miętowy dla etykiet zamiast szarego */
+  --input-bg: #091413;       /* Ciemne pola tekstowe */
+  
+  --main-font: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+}
+
+/* Główne style dla całej strony */
+body {
+  background-color: var(--dark-bg);
+  color: var(--text-main);
+  font-family: var(--main-font);
+  margin: 0;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Globalne tytuły */
+h1, h2, h3, h4, h5, h6 {
+  color: var(--accent-hover); /* Zmienione na jasny miętowy dla kontrastu */
+  font-weight: 700;
+}
+
+/* Karty */
+.card {
+  background-color: var(--card-bg) !important;
+  border: none !important;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+.card h1, .card h2, .card h3 {
+    color: var(--text-main);
+}
+
+/* Przyciski */
+.btn-primary {
+  background-color: var(--accent-cyan) !important;
+  border-color: var(--accent-cyan) !important;
+  color: #FFFFFF !important;
+  font-weight: 700 !important;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+}
+.btn-primary:hover, .btn-primary:focus {
+  background-color: var(--accent-hover) !important;
+  border-color: var(--accent-hover) !important;
+  color: #091413 !important; /* Ciemny tekst na jasnym przycisku */
+}
+
+/* Formularze */
+.form-control {
+  background-color: var(--input-bg) !important;
+  color: var(--text-main) !important;
+  border: 1px solid var(--accent-cyan) !important; 
+  border-radius: 8px;
+}
+.form-control:focus {
+  background-color: var(--input-bg) !important;
+  border-color: var(--accent-hover) !important;
+  box-shadow: 0 0 0 0.25rem rgba(176, 228, 204, 0.25) !important;
+}
+.form-label {
+  color: var(--text-sub) !important;
+  font-size: 0.9rem;
+}

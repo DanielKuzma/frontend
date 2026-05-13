@@ -5,7 +5,7 @@ import { Outlet, Link } from 'react-router-dom';
 const Layout = ({ handleLogout }) => {
     return (
         <>
-            {/* Górny pasek nawigacji dopasowany do Twojego ciemnego motywu */}
+            {/* Górny pasek nawigacji dopasowany do ciemnego motywu */}
             <Navbar style={{ backgroundColor: 'var(--card-bg)' }} variant="dark" expand="lg" className="shadow mb-4">
                 <Container>
                     <Navbar.Brand as={Link} to="/" style={{ color: 'var(--accent-hover)', fontWeight: 'bold' }}>
@@ -15,9 +15,11 @@ const Layout = ({ handleLogout }) => {
                     <Navbar.Collapse id="basic-navbar-nav">
                             <Nav className="me-auto">
                                 <Nav.Link as={Link} to="/rooms">Pokoje</Nav.Link>
-                                <Nav.Link as={Link} to="/devices">Wszystkie Urządzenia</Nav.Link> {/* <--- NOWY LINK */}
+                                <Nav.Link as={Link} to="/devices">Wszystkie Urządzenia</Nav.Link>
                                 <Nav.Link as={Link} to="/users/me">Mój Profil</Nav.Link>
                                 <Nav.Link as={Link} to="/sensors">Czujniki</Nav.Link>
+                                {/* Poprawiony kolor: usunięto style={{ color: 'var(--accent-cyan)' }} */}
+                                <Nav.Link as={Link} to="/automations">Automatyzacje</Nav.Link>
                                 <Nav.Link as={Link} to="/users">Zarządzanie Użytkownikami</Nav.Link>
                             </Nav>
                         <Button variant="outline-danger" onClick={handleLogout}>Wyloguj</Button>
@@ -25,7 +27,7 @@ const Layout = ({ handleLogout }) => {
                 </Container>
             </Navbar>
             
-            {/* Główny kontener, w którym będą się ładować poszczególne podstrony */}
+            {/* Główny kontener */}
             <Container>
                 <Outlet />
             </Container>

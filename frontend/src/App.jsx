@@ -9,6 +9,7 @@ import Register from './components/Register';
 import Profile from './components/Profile';
 import AllDevices from './components/AllDevices';
 import Sensors from './components/Sensors';
+import Automations from "./components/Automations";
 
 function App() {
   const [token, setToken] = useState(localStorage.getItem('token'));
@@ -51,6 +52,7 @@ function App() {
             <Route path="users/me" element={<Profile />} />
             <Route path="devices" element={<AllDevices />} />
             <Route path="sensors" element={<Sensors />} />
+            <Route path="/automations" element={<Automations />} />
         </Route>
 
         {/* Jeśli ktoś wpisze zły adres, wyrzucamy go na stronę główną lub do logowania */}

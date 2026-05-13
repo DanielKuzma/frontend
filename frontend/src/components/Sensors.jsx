@@ -30,9 +30,16 @@ const Sensors = () => {
     const fetchSensors = async () => {
         try {
             const response = await api.get('/sensors');
-            setSensors(response.data);
+            // Zabezpieczenie: upewniamy się, że response.data to tablica
+            if (Array.isArray(response.data)) {
+                setSensors(response.data);
+            } else {
+                console.error("Backend nie zwrócił listy czujników!", response.data);
+                setSensors([]); 
+            }
         } catch (error) {
             console.error("Błąd pobierania czujników", error);
+            setSensors([]);
         }
     };
 
@@ -105,14 +112,34 @@ const Sensors = () => {
     const handleGetReading = async (id) => {
         try {
             const response = await api.get(`/sensors/readings/${id}`);
-            if (response.data && response.data.value !== undefined) {
+            console.log("Dane odczytu z backendu:", response.data);
+
+            // Sprawdzamy, czy Java zwróciła nam listę (Array) i czy ta lista nie jest pusta
+            if (Array.isArray(response.data) && response.data.length > 0) {
+                // Pobieramy OSTATNI element z listy (najnowszy odczyt)
+                const latestReading = response.data[response.data.length - 1];
+                
+                setToastVariant('primary');
+                // Sprawdzamy czy ma pole value, czy valueText (w zależności co wysłała Java)
+                setToastMessage(`Najnowszy odczyt: ${latestReading.value !== null ? latestReading.value : latestReading.valueText}`);
+                setShowToast(true);
+            } 
+            // Zabezpieczenie dla innych formatów (gdyby Java jednak wysłała pojedynczy obiekt)
+            else if (response.data && !Array.isArray(response.data) && response.data.value !== undefined) {
                 setToastVariant('primary');
                 setToastMessage(`Odczyt czujnika: ${response.data.value}`);
                 setShowToast(true);
+            } 
+            // Jeśli lista jest pusta
+            else {
+                setToastVariant('info');
+                setToastMessage("Ten czujnik nie zarejestrował jeszcze żadnych odczytów.");
+                setShowToast(true);
             }
         } catch (error) {
-            setToastVariant('warning');
-            setToastMessage("Błąd pobierania odczytu.");
+            console.error("Szczegóły błędu odczytu:", error);
+            setToastVariant('danger');
+            setToastMessage("Błąd pobierania odczytu z serwera.");
             setShowToast(true);
         }
     };

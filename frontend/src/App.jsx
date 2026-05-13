@@ -10,6 +10,7 @@ import Profile from './components/Profile';
 import AllDevices from './components/AllDevices';
 import Sensors from './components/Sensors';
 import Automations from "./components/Automations";
+import Schedules from './components/Schedules';
 
 function App() {
   const [token, setToken] = useState(localStorage.getItem('token'));
@@ -53,6 +54,7 @@ function App() {
             <Route path="devices" element={<AllDevices />} />
             <Route path="sensors" element={<Sensors />} />
             <Route path="/automations" element={<Automations />} />
+            <Route path="/schedules" element={<Schedules />} />
         </Route>
 
         {/* Jeśli ktoś wpisze zły adres, wyrzucamy go na stronę główną lub do logowania */}

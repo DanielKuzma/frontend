@@ -32,16 +32,28 @@ const Devices = () => {
         operator: 'GT', 
         threshold: '',
         targetStatus: 'ON'
-        // Usunąłem stąd sztywny actionPayload, będziemy go ustawiać dynamicznie
     });
 
     const [showToast, setShowToast] = useState(false);
     const [toastMessage, setToastMessage] = useState('');
     const [toastVariant, setToastVariant] = useState('success');
 
+    // Pierwsze załadowanie danych po wejściu do pokoju
     useEffect(() => {
         fetchInitialData();
     }, [roomId]);
+
+    // --- NOWOŚĆ: Automatyczne odświeżanie (Polling) ---
+    useEffect(() => {
+        // Ustawiamy interwał, który co 3 sekundy (3000 ms) w tle pobiera nowe dane
+        const intervalId = setInterval(() => {
+            fetchDevicesOnly();
+        }, 3000);
+
+        // Funkcja sprzątająca (czyszczenie interwału, gdy wyjdziesz z tej zakładki)
+        return () => clearInterval(intervalId);
+    }, [roomId]);
+    // --------------------------------------------------
 
     const fetchInitialData = async () => {
         try {
@@ -133,7 +145,6 @@ const Devices = () => {
                 threshold: parseFloat(newRule.threshold),
                 sensorId: parseInt(newRule.sensorId),
                 userId: currentUserId,
-                // POPRAWKA: Wysyłamy do bazy "ON" lub "OFF" jako payload, żeby ładnie wyglądało w tabeli!
                 actionPayload: newRule.targetStatus 
             };
 

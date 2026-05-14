@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Spinner, Alert, Button, Badge, Card, Modal, Form, Toast, ToastContainer, Row, Col } from 'react-bootstrap';
+import { Table, Spinner, Alert, Button, Badge, Modal, Form, Row, Col } from 'react-bootstrap';
 import api from '../api';
+import { useNotification } from '../NotificationContext'; // <-- Import globalnego hooka
 
 const Schedules = () => {
     const [schedules, setSchedules] = useState([]);
@@ -10,7 +11,6 @@ const Schedules = () => {
 
     const [showModal, setShowModal] = useState(false);
     
-    // Formularz idealnie dopasowany do Twojej bazy danych (BY_DEVICE_TYPE, BY_ROOM, ALL)
     const [newSchedule, setNewSchedule] = useState({
         name: '',
         executionTime: '',
@@ -20,9 +20,8 @@ const Schedules = () => {
         deviceType: 'LIGHT'
     });
 
-    const [showToast, setShowToast] = useState(false);
-    const [toastMessage, setToastMessage] = useState('');
-    const [toastVariant, setToastVariant] = useState('success');
+    // Wyciągamy funkcję powiadomień
+    const { showNotification } = useNotification();
 
     useEffect(() => {
         fetchInitialData();
@@ -74,9 +73,7 @@ const Schedules = () => {
                 cronExpression: timeToCron(newSchedule.executionTime),
                 targetStatus: newSchedule.targetStatus,
                 targetType: newSchedule.targetType,
-                // Wysyłamy deviceType tylko jeśli wybrano typ urządzenia
                 deviceType: newSchedule.targetType === 'BY_DEVICE_TYPE' ? newSchedule.deviceType : null,
-                // Wysyłamy targetId tylko jeśli wybrano konkretny pokój
                 targetId: newSchedule.targetType === 'BY_ROOM' ? parseInt(newSchedule.targetId) : null,
                 enabled: true
             };
@@ -87,14 +84,10 @@ const Schedules = () => {
             setNewSchedule({ name: '', executionTime: '', targetStatus: 'ON', targetType: 'ALL', targetId: '', deviceType: 'LIGHT' });
             fetchSchedules();
 
-            setToastVariant('success');
-            setToastMessage("Pomyślnie utworzono harmonogram.");
-            setShowToast(true);
+            showNotification('Pomyślnie utworzono harmonogram.', 'success');
         } catch (err) {
             console.error("Błąd zapisu:", err);
-            setToastVariant('danger');
-            setToastMessage("Błąd zapisu! Sprawdź logi w konsoli.");
-            setShowToast(true);
+            showNotification('Błąd zapisu! Sprawdź poświadczenia lub połączenie z serwerem.', 'danger');
         }
     };
 
@@ -102,8 +95,9 @@ const Schedules = () => {
         try {
             await api.post(`/schedules/toggle/${id}`);
             fetchSchedules();
+            showNotification('Zmieniono status harmonogramu.', 'success');
         } catch (err) {
-            alert('Nie udało się zmienić statusu.');
+            showNotification('Nie udało się zmienić statusu.', 'danger');
         }
     };
 
@@ -112,30 +106,33 @@ const Schedules = () => {
         try {
             await api.delete(`/schedules/${id}`);
             fetchSchedules();
+            showNotification('Harmonogram został usunięty.', 'success');
         } catch (err) {
-            alert('Błąd podczas usuwania.');
+            showNotification('Błąd podczas usuwania.', 'danger');
         }
     };
 
     if (loading) return <Spinner animation="border" style={{ color: 'var(--accent-cyan)' }} className="d-block mx-auto mt-5" />;
-    if (error) return <Alert variant="danger" className="mt-4">{error}</Alert>;
+    if (error) return <Alert variant="danger" className="mt-4 container-main-view">{error}</Alert>;
 
     return (
-        <div className="mt-4">
-            <div className="d-flex justify-content-between align-items-center mb-4">
-                <h2 style={{ color: 'var(--text-main)' }}>🕒 Harmonogramy Czasowe</h2>
-                <Button variant="primary" onClick={() => setShowModal(true)}>
-                    + Nowe Zadanie
-                </Button>
-            </div>
-            
-            {schedules.length === 0 ? (
-                <Alert variant="info">Lista harmonogramów jest pusta.</Alert>
-            ) : (
-                <Card className="shadow bg-dark border-0">
+        <div className="mt-4 container-main-view">
+            <div className="main-card-container shadow border-0">
+                <div className="d-flex justify-content-between align-items-center mb-4">
+                    <h2 className="section-title mb-0" style={{ color: 'var(--accent-cyan)' }}>
+                        Harmonogramy Czasowe
+                    </h2>
+                    <Button variant="primary" onClick={() => setShowModal(true)}>
+                        + Nowe Zadanie
+                    </Button>
+                </div>
+                
+                {schedules.length === 0 ? (
+                    <Alert variant="info" className="m-0">Lista harmonogramów jest pusta.</Alert>
+                ) : (
                     <Table striped bordered hover variant="dark" responsive className="m-0 align-middle">
                         <thead>
-                            <tr>
+                            <tr className="text-center">
                                 <th>Nazwa</th>
                                 <th>Zakres działania</th>
                                 <th>Godzina</th>
@@ -147,26 +144,26 @@ const Schedules = () => {
                         <tbody>
                             {schedules.map(sch => (
                                 <tr key={sch.id}>
-                                    <td className="fw-bold" style={{ color: 'var(--accent-cyan)' }}>{sch.name}</td>
-                                    <td>
+                                    <td className="fw-bold" style={{ color: 'var(--accent-hover)' }}>{sch.name}</td>
+                                    <td className="text-center">
                                         {sch.targetType === 'ALL' && <Badge bg="primary">Cały budynek</Badge>}
                                         {sch.targetType === 'BY_DEVICE_TYPE' && <Badge bg="info" text="dark">Typ: {sch.deviceType}</Badge>}
                                         {sch.targetType === 'BY_ROOM' && <Badge bg="success">Pokój ID: {sch.targetId}</Badge>}
                                     </td>
-                                    <td className="fs-5 fw-bold">
+                                    <td className="text-center fs-5 fw-bold" style={{ color: 'var(--accent-cyan)' }}>
                                         {cronToTime(sch.cronExpression)}
                                     </td>
-                                    <td>
-                                        <Badge bg={sch.targetStatus === 'ON' ? 'info' : 'secondary'} className="px-3 py-2">
+                                    <td className="text-center">
+                                        <Badge bg={sch.targetStatus === 'ON' ? 'info' : 'secondary'} text={sch.targetStatus === 'ON' ? 'dark' : 'light'} className="px-3 py-2">
                                             {sch.targetStatus}
                                         </Badge>
                                     </td>
-                                    <td>
+                                    <td className="text-center">
                                         <Badge bg={sch.enabled ? "success" : "danger"}>
                                             {sch.enabled ? "AKTYWNY" : "WSTRZYMANY"}
                                         </Badge>
                                     </td>
-                                    <td>
+                                    <td className="text-center">
                                         <Button 
                                             variant={sch.enabled ? 'outline-warning' : 'outline-success'} 
                                             size="sm" className="me-2"
@@ -182,33 +179,49 @@ const Schedules = () => {
                             ))}
                         </tbody>
                     </Table>
-                </Card>
-            )}
+                )}
+            </div>
 
             <Modal show={showModal} onHide={() => setShowModal(false)} centered size="lg">
-                <div style={{ backgroundColor: 'var(--card-bg)', color: 'var(--text-main)' }}>
-                    <Modal.Header closeButton closeVariant="white">
+                <div style={{ backgroundColor: 'var(--card-bg)', color: 'var(--text-main)', borderRadius: '12px', border: '1px solid var(--accent-hover)' }}>
+                    <Modal.Header closeButton closeVariant="white" className="border-secondary">
                         <Modal.Title>Dodaj Harmonogram</Modal.Title>
                     </Modal.Header>
-                    <Modal.Body>
+                    <Modal.Body className="p-4">
                         <Form onSubmit={handleAddSchedule}>
                             <Row>
                                 <Col md={6}>
                                     <Form.Group className="mb-3">
                                         <Form.Label>Nazwa zadania</Form.Label>
-                                        <Form.Control type="text" required value={newSchedule.name} onChange={(e) => setNewSchedule({...newSchedule, name: e.target.value})} />
+                                        <Form.Control 
+                                            type="text" 
+                                            required 
+                                            value={newSchedule.name} 
+                                            onChange={(e) => setNewSchedule({...newSchedule, name: e.target.value})} 
+                                            style={{ backgroundColor: 'var(--input-bg)', color: 'var(--text-main)', border: '1px solid #334155' }}
+                                        />
                                     </Form.Group>
                                 </Col>
                                 <Col md={3}>
                                     <Form.Group className="mb-3">
                                         <Form.Label>Godzina</Form.Label>
-                                        <Form.Control type="time" required value={newSchedule.executionTime} onChange={(e) => setNewSchedule({...newSchedule, executionTime: e.target.value})} />
+                                        <Form.Control 
+                                            type="time" 
+                                            required 
+                                            value={newSchedule.executionTime} 
+                                            onChange={(e) => setNewSchedule({...newSchedule, executionTime: e.target.value})} 
+                                            style={{ backgroundColor: 'var(--input-bg)', color: 'var(--text-main)', border: '1px solid #334155' }}
+                                        />
                                     </Form.Group>
                                 </Col>
                                 <Col md={3}>
                                     <Form.Group className="mb-3">
                                         <Form.Label>Status Docelowy</Form.Label>
-                                        <Form.Select value={newSchedule.targetStatus} onChange={(e) => setNewSchedule({...newSchedule, targetStatus: e.target.value})}>
+                                        <Form.Select 
+                                            value={newSchedule.targetStatus} 
+                                            onChange={(e) => setNewSchedule({...newSchedule, targetStatus: e.target.value})}
+                                            style={{ backgroundColor: 'var(--input-bg)', color: 'var(--text-main)', border: '1px solid #334155' }}
+                                        >
                                             <option value="ON">ON</option>
                                             <option value="OFF">OFF</option>
                                         </Form.Select>
@@ -217,8 +230,12 @@ const Schedules = () => {
                             </Row>
 
                             <Form.Group className="mb-3 mt-3">
-                                <Form.Label className="text-info fw-bold">Zasięg zadania</Form.Label>
-                                <Form.Select value={newSchedule.targetType} onChange={(e) => setNewSchedule({...newSchedule, targetType: e.target.value, targetId: ''})}>
+                                <Form.Label className="fw-bold" style={{ color: 'var(--accent-hover)' }}>Zasięg zadania</Form.Label>
+                                <Form.Select 
+                                    value={newSchedule.targetType} 
+                                    onChange={(e) => setNewSchedule({...newSchedule, targetType: e.target.value, targetId: ''})}
+                                    style={{ backgroundColor: 'var(--input-bg)', color: 'var(--text-main)', border: '1px solid #334155' }}
+                                >
                                     <option value="ALL">Cały budynek (Wszystko)</option>
                                     <option value="BY_DEVICE_TYPE">Według typu urządzenia</option>
                                     <option value="BY_ROOM">W konkretnym pokoju</option>
@@ -228,7 +245,12 @@ const Schedules = () => {
                             {newSchedule.targetType === 'BY_ROOM' && (
                                 <Form.Group className="mb-3">
                                     <Form.Label>Wybierz Pokój</Form.Label>
-                                    <Form.Select required value={newSchedule.targetId} onChange={(e) => setNewSchedule({...newSchedule, targetId: e.target.value})}>
+                                    <Form.Select 
+                                        required 
+                                        value={newSchedule.targetId} 
+                                        onChange={(e) => setNewSchedule({...newSchedule, targetId: e.target.value})}
+                                        style={{ backgroundColor: 'var(--input-bg)', color: 'var(--text-main)', border: '1px solid #334155' }}
+                                    >
                                         <option value="">-- Wybierz pokój --</option>
                                         {rooms.map(r => <option key={r.id} value={r.id}>{r.name} (P{r.floor})</option>)}
                                     </Form.Select>
@@ -238,7 +260,11 @@ const Schedules = () => {
                             {newSchedule.targetType === 'BY_DEVICE_TYPE' && (
                                 <Form.Group className="mb-3">
                                     <Form.Label>Typ Urządzenia</Form.Label>
-                                    <Form.Select value={newSchedule.deviceType} onChange={(e) => setNewSchedule({...newSchedule, deviceType: e.target.value})}>
+                                    <Form.Select 
+                                        value={newSchedule.deviceType} 
+                                        onChange={(e) => setNewSchedule({...newSchedule, deviceType: e.target.value})}
+                                        style={{ backgroundColor: 'var(--input-bg)', color: 'var(--text-main)', border: '1px solid #334155' }}
+                                    >
                                         <option value="LIGHT">Światła (LIGHT)</option>
                                         <option value="HEATER">Grzejniki (HEATER)</option>
                                         <option value="AIR_CONDITIONER">Klimatyzatory (AIR_CONDITIONER)</option>
@@ -247,21 +273,14 @@ const Schedules = () => {
                                 </Form.Group>
                             )}
 
-                            <div className="d-flex justify-content-end mt-4">
-                                <Button variant="secondary" className="me-2" onClick={() => setShowModal(false)}>Anuluj</Button>
-                                <Button variant="success" type="submit">Zapisz zadanie</Button>
+                            <div className="d-flex justify-content-end mt-4 gap-2">
+                                <Button variant="secondary" onClick={() => setShowModal(false)}>Anuluj</Button>
+                                <Button variant="primary" type="submit" className="fw-bold px-4">Zapisz zadanie</Button>
                             </div>
                         </Form>
                     </Modal.Body>
                 </div>
             </Modal>
-
-            <ToastContainer position="bottom-end" className="p-3" style={{ zIndex: 9999 }}>
-                <Toast onClose={() => setShowToast(false)} show={showToast} delay={3000} autohide bg={toastVariant}>
-                    <Toast.Header><strong className="me-auto">Harmonogramy</strong></Toast.Header>
-                    <Toast.Body className={(toastVariant === 'success' || toastVariant === 'danger' || toastVariant === 'primary') ? 'text-white' : 'text-dark'}>{toastMessage}</Toast.Body>
-                </Toast>
-            </ToastContainer>
         </div>
     );
 };

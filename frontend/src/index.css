@@ -1,20 +1,20 @@
 /* frontend/src/index.css */
 
 :root {
-  /* NOWE KOLORY Z TWOJEJ PALETY */
-  --dark-bg: #091413;        /* Najciemniejszy zielony (Tło strony) */
-  --card-bg: #285A48;        /* Ciemny zielony (Karty i formularze) */
-  --accent-cyan: #408A71;    /* Średni zielony (Przyciski i akcenty) */
-  --accent-hover: #B0E4CC;   /* Jasny miętowy (Najechanie myszką i tytuły) */
+  /* Paleta "Pastel Sky Night" */
+  --bg-color: #0F172A;       /* Głęboki, nocny granat - tło całej aplikacji */
+  --card-bg: #1E293B;        /* Nieco jaśniejsze tło kart i modali */
+  --accent-hover: #7DD3FC;   /* Pastelowy błękit (Sky Blue) - najechania, ramki */
+  --accent-cyan: #BAE6FD;    /* Najjaśniejszy lodowy błękit - tytuly i wyróżnienia */
   
-  --text-main: #FFFFFF;      
-  --text-sub: #B0E4CC;       /* Miętowy dla etykiet zamiast szarego */
-  --input-bg: #091413;       /* Ciemne pola tekstowe */
+  --input-bg: #0F172A;       
+  --text-main: #F8FAFC;      
+  --text-sub: #BAE6FD;       
   
-  --main-font: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --dark-bg: var(--bg-color);
+  --main-font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 
-/* Główne style dla całej strony */
 body {
   background-color: var(--dark-bg);
   color: var(--text-main);
@@ -23,51 +23,104 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Globalne tytuły */
-h1, h2, h3, h4, h5, h6 {
-  color: var(--accent-hover); /* Zmienione na jasny miętowy dla kontrastu */
+/* --- POPRAWKA KOLORU TYTUŁÓW --- */
+h1, h2, h3, h4, h5, h6, .section-title {
+  color: var(--accent-cyan) !important; /* Używamy najjaśniejszego błękitu dla efektu "świecenia" */
   font-weight: 700;
+  text-shadow: 0 0 15px rgba(186, 230, 253, 0.2); /* Delikatny blask wokół liter */
 }
 
 /* Karty */
 .card {
   background-color: var(--card-bg) !important;
-  border: none !important;
+  border: 1px solid #334155 !important;
   border-radius: 12px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
 }
-.card h1, .card h2, .card h3 {
-    color: var(--text-main);
+
+.modal-content {
+  background-color: var(--card-bg) !important;
+  color: var(--text-main) !important;
+  border: 1px solid var(--accent-hover);
 }
 
 /* Przyciski */
 .btn-primary {
-  background-color: var(--accent-cyan) !important;
-  border-color: var(--accent-cyan) !important;
-  color: #FFFFFF !important;
+  background-color: var(--accent-hover) !important;
+  border-color: var(--accent-hover) !important;
+  color: #0F172A !important; 
   font-weight: 700 !important;
   border-radius: 8px;
   transition: all 0.3s ease;
 }
-.btn-primary:hover, .btn-primary:focus {
-  background-color: var(--accent-hover) !important;
-  border-color: var(--accent-hover) !important;
-  color: #091413 !important; /* Ciemny tekst na jasnym przycisku */
-}
 
 /* Formularze */
-.form-control {
+.form-control, .form-select {
   background-color: var(--input-bg) !important;
   color: var(--text-main) !important;
-  border: 1px solid var(--accent-cyan) !important; 
+  border: 1px solid #334155 !important; 
   border-radius: 8px;
 }
-.form-control:focus {
-  background-color: var(--input-bg) !important;
-  border-color: var(--accent-hover) !important;
-  box-shadow: 0 0 0 0.25rem rgba(176, 228, 204, 0.25) !important;
+
+.form-control::placeholder {
+  color: rgba(248, 250, 252, 0.5) !important;
 }
-.form-label {
+
+.input-group-text {
+  background-color: var(--accent-hover) !important;
+  color: #0F172A !important;
+  border: none !important;
+}
+
+/* Naprawa widoczności tekstów pomocniczych (np. Data w logach) */
+.text-muted {
   color: var(--text-sub) !important;
-  font-size: 0.9rem;
+  opacity: 0.8;
+}
+
+/* Style suwaka i przyklejonych nagłówków */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #475569;
+  border-radius: 4px;
+}
+th {
+  position: sticky;
+  top: 0;
+  background-color: var(--card-bg) !important;
+  z-index: 10;
+  border-bottom: 2px solid var(--accent-hover) !important;
+}
+
+/* Kontener ograniczający szerokość na dużych ekranach */
+.container-main-view {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+
+/* Główne opakowanie dla treści na każdej stronie */
+.main-card-container {
+  background-color: var(--card-bg) !important;
+  border: 1px solid #334155 !important; /* Wyraźniejsza ramka jak w czujnikach */
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  margin-top: 20px;
+  margin-bottom: 30px;
+}
+
+/* Poprawka dla nagłówków wewnątrz tych kart, żeby nie były zbyt blisko krawędzi */
+.main-card-container h2 {
+  margin-top: 0;
+  margin-bottom: 1.5rem;
+}
+
+/* Ujednolicenie efektu dla wszystkich podstron */
+.container-main-view {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 15px;
 }

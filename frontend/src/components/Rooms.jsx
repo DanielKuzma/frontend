@@ -2,40 +2,32 @@ import React, { useState, useEffect } from 'react';
 import { Row, Col, Card, Spinner, Alert, Button, Modal, Form } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
 import api from '../api';
+import { useNotification } from '../NotificationContext';
 
 const Rooms = () => {
     const navigate = useNavigate();
     const [rooms, setRooms] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
-    
-    // --- NOWOŚĆ: Stan przechowujący rolę zalogowanego użytkownika ---
     const [userRole, setUserRole] = useState(''); 
-    
     const [showModal, setShowModal] = useState(false);
     const [newRoom, setNewRoom] = useState({
-        name: '',
-        description: '',
-        floor: 0,
-        areaInSquareM: 0.0
+        name: '', description: '', floor: 0, areaInSquareM: 0.0
     });
-    const [actionError, setActionError] = useState('');
+    
+    // Zastępujemy lokalny actionError hookiem powiadomień
+    const { showNotification } = useNotification();
 
     useEffect(() => {
         fetchInitialData();
     }, []);
 
-    // --- NOWOŚĆ: Pobieramy dane o użytkowniku ORAZ listę pokoi ---
     const fetchInitialData = async () => {
         try {
-            // Najpierw pytamy backend "Kim jestem?"
             const userResponse = await api.get('/users/me');
             setUserRole(userResponse.data.role);
-
-            // Potem pobieramy pokoje
             const roomsResponse = await api.get('/rooms');
             setRooms(roomsResponse.data);
-            
             setLoading(false);
         } catch (err) {
             setError('Nie udało się pobrać danych z serwera.');
@@ -54,7 +46,6 @@ const Rooms = () => {
 
     const handleAddRoom = async (e) => {
         e.preventDefault();
-        setActionError('');
         try {
             const payload = {
                 name: newRoom.name,
@@ -63,23 +54,28 @@ const Rooms = () => {
                 areaInSquareM: parseFloat(newRoom.areaInSquareM)
             };
             await api.post('/rooms', payload);
-            
             setShowModal(false);     
             setNewRoom({ name: '', description: '', floor: 0, areaInSquareM: 0.0 });      
             fetchRoomsOnly();            
+            showNotification('Pomyślnie dodano nowe pomieszczenie.', 'success');
         } catch (err) {
-            setActionError('Wystąpił błąd podczas dodawania pokoju.');
+            // OBSŁUGA BŁĘDU 409
+            if (err.response && err.response.status === 409) {
+                showNotification('Pomieszczenie o takiej nazwie już istnieje! Wybierz inną.', 'warning');
+            } else {
+                showNotification('Wystąpił błąd podczas dodawania pokoju. Sprawdź połączenie.', 'danger');
+            }
         }
     };
 
     const handleDeleteRoom = async (id) => {
         if (!window.confirm('Czy na pewno chcesz usunąć ten pokój?')) return;
-        setActionError('');
         try {
             await api.delete(`/rooms/${id}`);
             fetchRoomsOnly();
+            showNotification('Pomieszczenie zostało pomyślnie usunięte.', 'success');
         } catch (err) {
-            setActionError('Wystąpił błąd podczas usuwania pokoju.');
+            showNotification('Wystąpił błąd podczas usuwania pokoju.', 'danger');
         }
     };
 
@@ -88,76 +84,88 @@ const Rooms = () => {
         setNewRoom(prev => ({ ...prev, [name]: value }));
     };
 
-    // --- NOWOŚĆ: Funkcja sprawdzająca czy user może zarządzać ---
     const canManage = userRole === 'ADMIN' || userRole === 'BUILDING_MANAGER';
 
-    if (loading) return <Spinner animation="border" style={{ color: 'var(--accent-cyan)' }} />;
-    if (error) return <Alert variant="danger">{error}</Alert>;
+    if (loading) return <Spinner animation="border" style={{ color: 'var(--accent-cyan)' }} className="d-block mx-auto mt-5" />;
+    if (error) return <Alert variant="danger" className="mt-4 container-main-view">{error}</Alert>;
 
     return (
-        <div>
-            <div className="d-flex justify-content-between align-items-center mb-4">
-                <h2>Zarządzanie Pomieszczeniami</h2>
-                
-                {/* Ukrywamy przycisk jeśli użytkownik nie ma uprawnień */}
-                {canManage && (
-                    <Button variant="primary" onClick={() => setShowModal(true)}>
-                        + Dodaj Pokój
-                    </Button>
+        <div className="mt-4 container-main-view">
+            {/* GŁÓWNA KARTA OPAKOWUJĄCA */}
+            <div className="main-card-container shadow border-0 p-4">
+                <div className="d-flex justify-content-between align-items-center mb-4">
+                    <h2 className="section-title mb-0">Zarządzanie Pomieszczeniami</h2>
+                    {canManage && (
+                        <Button variant="primary" onClick={() => setShowModal(true)}>
+                            + Dodaj Pokój
+                        </Button>
+                    )}
+                </div>
+
+                {rooms.length === 0 ? (
+                    <p className="text-center py-5" style={{ color: 'var(--text-sub)' }}>
+                        Baza danych jest pusta. Brak pomieszczeń.
+                    </p>
+                ) : (
+                    <Row xs={1} md={2} lg={3} className="g-4">
+                        {rooms.map((room) => (
+                            <Col key={room.id}>
+                                <Card 
+                                    style={{ 
+                                        backgroundColor: 'var(--bg-color)', 
+                                        border: '1px solid var(--accent-hover)' 
+                                    }} 
+                                    className="h-100 shadow-sm transition-hover"
+                                >
+                                    <Card.Body className="d-flex flex-column p-4">
+                                        <Card.Title style={{ color: 'var(--accent-cyan)', fontSize: '1.4rem' }} className="fw-bold mb-3">
+                                            {room.name}
+                                        </Card.Title>
+                                        
+                                        <div style={{ color: 'var(--text-sub)', fontSize: '0.95rem' }} className="mb-4 flex-grow-1">
+                                            <p className="mb-2"><strong style={{ color: '#fff' }}>Opis:</strong> {room.description || 'Brak opisu'}</p>
+                                            <p className="mb-2"><strong style={{ color: '#fff' }}>Piętro:</strong> {room.floor}</p>
+                                            <p className="mb-0"><strong style={{ color: '#fff' }}>Metraż:</strong> {room.areaInSquareM} m²</p>
+                                        </div>
+
+                                        <div className="mt-auto d-flex justify-content-between gap-2">
+                                            <Button 
+                                                variant="primary" 
+                                                size="sm" 
+                                                className="flex-grow-1 fw-bold"
+                                                onClick={() => navigate(`/rooms/${room.id}/devices`)}
+                                            >
+                                                Urządzenia
+                                            </Button>
+                                            {canManage && (
+                                                <Button 
+                                                    variant="outline-danger" 
+                                                    size="sm" 
+                                                    onClick={() => handleDeleteRoom(room.id)}
+                                                >
+                                                    Usuń
+                                                </Button>
+                                            )}
+                                        </div>
+                                    </Card.Body>
+                                </Card>
+                            </Col>
+                        ))}
+                    </Row>
                 )}
             </div>
 
-            {actionError && <Alert variant="danger" onClose={() => setActionError('')} dismissible>{actionError}</Alert>}
-            
-            {rooms.length === 0 ? (
-                <p style={{ color: 'var(--text-sub)' }}>Baza danych jest pusta. Brak pomieszczeń.</p>
-            ) : (
-                <Row xs={1} md={2} lg={3} className="g-4">
-                    {rooms.map((room) => (
-                        <Col key={room.id}>
-                            <Card className="h-100 shadow">
-                                <Card.Body className="d-flex flex-column">
-                                    <Card.Title style={{ color: 'var(--accent-hover)' }} className="mb-3">
-                                        {room.name}
-                                    </Card.Title>
-                                    
-                                    <div style={{ color: 'var(--text-sub)', fontSize: '0.9rem' }} className="mb-3 flex-grow-1">
-                                        <p className="mb-1"><strong>Opis:</strong> {room.description || 'Brak opisu'}</p>
-                                        <p className="mb-1"><strong>Piętro:</strong> {room.floor}</p>
-                                        <p className="mb-1"><strong>Metraż:</strong> {room.areaInSquareM} m²</p>
-                                    </div>
-
-                                    <div className="mt-auto d-flex justify-content-between">
-                                        <Button 
-                                            variant="outline-info" 
-                                            size="sm" 
-                                            onClick={() => navigate(`/devices/rooms/${room.id}`)}
-                                        >
-                                            Urządzenia
-                                        </Button>
-                                        {/* Ukrywamy przycisk USUŃ jeśli użytkownik nie ma uprawnień */}
-                                        {canManage && (
-                                            <Button variant="outline-danger" size="sm" onClick={() => handleDeleteRoom(room.id)}>Usuń</Button>
-                                        )}
-                                    </div>
-                                </Card.Body>
-                            </Card>
-                        </Col>
-                    ))}
-                </Row>
-            )}
-
-            {/* Modal - ten kod zostaje bez zmian */}
+            {/* Modal dodawania pokoju */}
             <Modal show={showModal} onHide={() => setShowModal(false)} centered>
-                <div style={{ backgroundColor: 'var(--card-bg)', color: 'var(--text-main)' }}>
-                    <Modal.Header closeButton closeVariant="white" style={{ borderBottomColor: '#3A475C' }}>
+                <div style={{ backgroundColor: 'var(--card-bg)', color: 'var(--text-main)', borderRadius: '12px', border: '1px solid var(--accent-hover)' }}>
+                    <Modal.Header closeButton closeVariant="white" className="border-secondary">
                         <Modal.Title>Nowe Pomieszczenie</Modal.Title>
                     </Modal.Header>
-                    <Modal.Body>
+                    <Modal.Body className="p-4">
                         <Form onSubmit={handleAddRoom}>
                             <Form.Group className="mb-3">
                                 <Form.Label>Nazwa pokoju</Form.Label>
-                                <Form.Control type="text" name="name" required value={newRoom.name} onChange={handleChange} />
+                                <Form.Control type="text" name="name" placeholder="np. Salon..." required value={newRoom.name} onChange={handleChange} />
                             </Form.Group>
                             <Form.Group className="mb-3">
                                 <Form.Label>Opis (opcjonalnie)</Form.Label>
@@ -177,9 +185,9 @@ const Rooms = () => {
                                     </Form.Group>
                                 </Col>
                             </Row>
-                            <div className="d-flex justify-content-end">
-                                <Button variant="secondary" className="me-2" onClick={() => setShowModal(false)}>Anuluj</Button>
-                                <Button variant="primary" type="submit">Zapisz pokój</Button>
+                            <div className="d-flex justify-content-end gap-2">
+                                <Button variant="secondary" onClick={() => setShowModal(false)}>Anuluj</Button>
+                                <Button variant="primary" type="submit" className="fw-bold px-4">Zapisz pokój</Button>
                             </div>
                         </Form>
                     </Modal.Body>

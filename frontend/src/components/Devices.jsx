@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Row, Col, Card, Spinner, Alert, Button, Modal, Form, Badge, Toast, ToastContainer } from 'react-bootstrap';
+import { Row, Col, Card, Spinner, Alert, Button, Modal, Form, Badge } from 'react-bootstrap';
 import api from '../api';
+import { useNotification } from '../NotificationContext'; // <-- Import globalnego hooka
 
 const Devices = () => {
     const { roomId } = useParams();
@@ -22,7 +23,6 @@ const Devices = () => {
         deviceStatus: 'OFF', 
         properties: ''
     });
-    const [actionError, setActionError] = useState('');
 
     const [showRuleModal, setShowRuleModal] = useState(false);
     const [selectedDevice, setSelectedDevice] = useState(null);
@@ -34,26 +34,19 @@ const Devices = () => {
         targetStatus: 'ON'
     });
 
-    const [showToast, setShowToast] = useState(false);
-    const [toastMessage, setToastMessage] = useState('');
-    const [toastVariant, setToastVariant] = useState('success');
+    // Wyciągamy funkcję do globalnych powiadomień
+    const { showNotification } = useNotification();
 
-    // Pierwsze załadowanie danych po wejściu do pokoju
     useEffect(() => {
         fetchInitialData();
     }, [roomId]);
 
-    // --- NOWOŚĆ: Automatyczne odświeżanie (Polling) ---
     useEffect(() => {
-        // Ustawiamy interwał, który co 3 sekundy (3000 ms) w tle pobiera nowe dane
         const intervalId = setInterval(() => {
             fetchDevicesOnly();
         }, 3000);
-
-        // Funkcja sprzątająca (czyszczenie interwału, gdy wyjdziesz z tej zakładki)
         return () => clearInterval(intervalId);
     }, [roomId]);
-    // --------------------------------------------------
 
     const fetchInitialData = async () => {
         try {
@@ -87,16 +80,19 @@ const Devices = () => {
 
     const handleAddDevice = async (e) => {
         e.preventDefault();
-        setActionError('');
         try {
             const payload = { ...newDevice, roomId: parseInt(roomId) };
             await api.post('/devices', payload);
             
             setShowModal(false);     
             setNewDevice({ name: '', deviceType: 'LIGHT', deviceStatus: 'OFF', properties: '' });      
-            fetchDevicesOnly();            
+            fetchDevicesOnly();
+            
+            // Powiadomienie o sukcesie dodania
+            showNotification('Pomyślnie dodano nowe urządzenie.', 'success');
         } catch (err) {
-            setActionError('Wystąpił błąd podczas dodawania urządzenia. Sprawdź uprawnienia.');
+            // Globalne powiadomienie o błędzie zamiast lokalnego alertu/erroru
+            showNotification('Wystąpił błąd podczas dodawania urządzenia. Sprawdź uprawnienia.', 'danger');
         }
     };
 
@@ -105,8 +101,9 @@ const Devices = () => {
         try {
             await api.delete(`/devices/${id}`);
             fetchDevicesOnly();
+            showNotification('Urządzenie zostało pomyślnie usunięte.', 'success');
         } catch (err) {
-            alert('Błąd usuwania (może brak uprawnień ADMIN?).');
+            showNotification('Błąd usuwania (może brak uprawnień ADMIN?).', 'danger');
         }
     };
 
@@ -115,8 +112,9 @@ const Devices = () => {
         try {
             await api.patch(`/devices/${id}?deviceStatus=${nextStatus}`);
             fetchDevicesOnly();
+            showNotification(`Zmieniono status urządzenia na ${nextStatus}.`, 'success');
         } catch (err) {
-            alert('Nie udało się zmienić statusu urządzenia.');
+            showNotification('Nie udało się zmienić statusu urządzenia.', 'danger');
         }
     };
 
@@ -151,15 +149,11 @@ const Devices = () => {
             await api.post('/automation/rules', payload);
 
             setShowRuleModal(false);
-            setToastVariant('success');
-            setToastMessage("Pomyślnie dodano nową regułę automatyzacji!");
-            setShowToast(true);
+            showNotification('Pomyślnie dodano nową regułę automatyzacji!', 'success');
 
         } catch (error) {
             console.error("Szczegóły błędu dodawania reguły:", error);
-            setToastVariant('danger');
-            setToastMessage("Błąd serwera (Sprawdź uprawnienia lub czy token nie wygasł).");
-            setShowToast(true);
+            showNotification('Błąd serwera (Sprawdź uprawnienia lub czy token nie wygasł).', 'danger');
         }
     };
 
@@ -176,83 +170,99 @@ const Devices = () => {
     const canAddDevice = userRole === 'ADMIN' || userRole === 'BUILDING_MANAGER';
     const canDeleteDevice = userRole === 'ADMIN';
 
-    if (loading) return <Spinner animation="border" style={{ color: 'var(--accent-cyan)' }} />;
-    if (error) return <Alert variant="danger">{error}</Alert>;
+    if (loading) return <Spinner animation="border" style={{ color: 'var(--accent-cyan)' }} className="d-block mx-auto mt-5" />;
+    if (error) return <Alert variant="danger" className="mt-4 container-main-view">{error}</Alert>;
 
     return (
-        <div>
+        <div className="mt-4 container-main-view">
             <Button variant="outline-secondary" className="mb-3" onClick={() => navigate('/rooms')}>
                 &larr; Wróć do listy pokoi
             </Button>
             
-            <div className="d-flex justify-content-between align-items-center mb-4">
-                <h2>Urządzenia w pokoju (ID: {roomId})</h2>
-                
-                {canAddDevice && (
-                    <Button variant="primary" onClick={() => setShowModal(true)}>
-                        + Dodaj Urządzenie
-                    </Button>
-                )}
-            </div>
+            <div className="main-card-container shadow border-0">
+                <div className="d-flex justify-content-between align-items-center mb-4">
+                    <h2 className="section-title mb-0" style={{ color: 'var(--accent-cyan)' }}>
+                        Urządzenia w pokoju (ID: {roomId})
+                    </h2>
+                    
+                    {canAddDevice && (
+                        <Button variant="primary" onClick={() => setShowModal(true)}>
+                            + Dodaj Urządzenie
+                        </Button>
+                    )}
+                </div>
 
-            {actionError && <Alert variant="danger">{actionError}</Alert>}
-            
-            {devices.length === 0 ? (
-                <p style={{ color: 'var(--text-sub)' }}>Brak urządzeń w tym pomieszczeniu.</p>
-            ) : (
-                <Row xs={1} md={2} lg={3} className="g-4">
-                    {devices.map((device) => (
-                        <Col key={device.id}>
-                            <Card className="h-100 shadow" style={{ borderLeft: device.deviceStatus === 'ON' ? '4px solid var(--accent-cyan)' : '4px solid gray' }}>
-                                <Card.Body className="d-flex flex-column">
-                                    <div className="d-flex justify-content-between align-items-start mb-2">
-                                        <Card.Title style={{ color: 'var(--accent-hover)' }}>{device.name}</Card.Title>
-                                        <Badge bg={getStatusBadgeVariant(device.deviceStatus)}>
-                                            {device.deviceStatus}
-                                        </Badge>
-                                    </div>
-                                    
-                                    <div style={{ color: 'var(--text-sub)', fontSize: '0.9rem' }} className="mb-4">
-                                        <p className="mb-1"><strong>Typ:</strong> {device.deviceType}</p>
-                                        <p className="mb-1"><strong>Szczegóły:</strong> {device.properties || 'Brak'}</p>
-                                    </div>
+                {devices.length === 0 ? (
+                    <p className="text-center py-5" style={{ color: 'var(--text-sub)' }}>
+                        Brak urządzeń w tym pomieszczeniu.
+                    </p>
+                ) : (
+                    <Row xs={1} md={2} lg={3} className="g-4">
+                        {devices.map((device) => (
+                            <Col key={device.id}>
+                                <Card 
+                                    className="h-100 shadow-sm transition-hover" 
+                                    style={{ 
+                                        backgroundColor: 'var(--bg-color)', 
+                                        border: '1px solid var(--accent-hover)',
+                                        borderLeft: device.deviceStatus === 'ON' ? '4px solid var(--accent-cyan)' : '4px solid #475569' 
+                                    }}
+                                >
+                                    <Card.Body className="d-flex flex-column p-4">
+                                        <div className="d-flex justify-content-between align-items-start mb-3">
+                                            <Card.Title className="fw-bold m-0" style={{ color: 'var(--accent-cyan)', fontSize: '1.25rem' }}>
+                                                {device.name}
+                                            </Card.Title>
+                                            <Badge bg={getStatusBadgeVariant(device.deviceStatus)} className="px-2 py-1">
+                                                {device.deviceStatus}
+                                            </Badge>
+                                        </div>
+                                        
+                                        <div style={{ color: 'var(--text-sub)', fontSize: '0.95rem' }} className="mb-4 flex-grow-1">
+                                            <p className="mb-2"><strong style={{ color: '#fff' }}>Typ:</strong> {device.deviceType}</p>
+                                            <p className="mb-0"><strong style={{ color: '#fff' }}>Szczegóły:</strong> {device.properties || 'Brak'}</p>
+                                        </div>
 
-                                    <div className="mt-auto d-flex justify-content-between align-items-center">
-                                        <div>
-                                            <Button 
-                                                variant={device.deviceStatus === 'ON' ? 'warning' : 'success'} 
-                                                size="sm" 
-                                                className="me-2"
-                                                onClick={() => toggleStatus(device.id, device.deviceStatus)}
-                                                disabled={device.deviceStatus === 'OFFLINE'} 
-                                            >
-                                                {device.deviceStatus === 'ON' ? 'Wyłącz' : 'Włącz'}
-                                            </Button>
+                                        <div className="mt-auto d-flex justify-content-between align-items-center gap-2">
+                                            <div className="d-flex gap-2 flex-grow-1">
+                                                <Button 
+                                                    variant={device.deviceStatus === 'ON' ? 'warning' : 'success'} 
+                                                    size="sm" 
+                                                    className="fw-bold flex-grow-1"
+                                                    onClick={() => toggleStatus(device.id, device.deviceStatus)}
+                                                    disabled={device.deviceStatus === 'OFFLINE'} 
+                                                >
+                                                    {device.deviceStatus === 'ON' ? 'Wyłącz' : 'Włącz'}
+                                                </Button>
+                                                
+                                                {canAddDevice && (
+                                                    <Button variant="outline-info" size="sm" onClick={() => handleOpenRuleCreator(device)}>
+                                                        Automatyzuj
+                                                    </Button>
+                                                )}
+                                            </div>
                                             
-                                            {canAddDevice && (
-                                                <Button variant="outline-info" size="sm" onClick={() => handleOpenRuleCreator(device)}>
-                                                    ⚙️ Automatyzuj
+                                            {canDeleteDevice && (
+                                                <Button variant="outline-danger" size="sm" onClick={() => handleDeleteDevice(device.id)}>
+                                                    Usuń
                                                 </Button>
                                             )}
                                         </div>
-                                        
-                                        {canDeleteDevice && (
-                                            <Button variant="outline-danger" size="sm" onClick={() => handleDeleteDevice(device.id)}>Usuń</Button>
-                                        )}
-                                    </div>
-                                </Card.Body>
-                            </Card>
-                        </Col>
-                    ))}
-                </Row>
-            )}
+                                    </Card.Body>
+                                </Card>
+                            </Col>
+                        ))}
+                    </Row>
+                )}
+            </div>
 
+            {/* Modal dodawania urządzenia */}
             <Modal show={showModal} onHide={() => setShowModal(false)} centered>
-                <div style={{ backgroundColor: 'var(--card-bg)', color: 'var(--text-main)' }}>
-                    <Modal.Header closeButton closeVariant="white" style={{ borderBottomColor: '#3A475C' }}>
+                <div style={{ backgroundColor: 'var(--card-bg)', color: 'var(--text-main)', borderRadius: '12px', border: '1px solid var(--accent-hover)' }}>
+                    <Modal.Header closeButton closeVariant="white" className="border-secondary">
                         <Modal.Title>Nowe Urządzenie</Modal.Title>
                     </Modal.Header>
-                    <Modal.Body>
+                    <Modal.Body className="p-4">
                         <Form onSubmit={handleAddDevice}>
                             <Form.Group className="mb-3">
                                 <Form.Label>Nazwa</Form.Label>
@@ -293,21 +303,22 @@ const Devices = () => {
                                 <Form.Control type="text" name="properties" placeholder="np. MAC: 00:1B:44:11:3A:B7" value={newDevice.properties} onChange={handleChange} />
                             </Form.Group>
 
-                            <div className="d-flex justify-content-end">
-                                <Button variant="secondary" className="me-2" onClick={() => setShowModal(false)}>Anuluj</Button>
-                                <Button variant="primary" type="submit">Dodaj urządzenie</Button>
+                            <div className="d-flex justify-content-end gap-2">
+                                <Button variant="secondary" onClick={() => setShowModal(false)}>Anuluj</Button>
+                                <Button variant="primary" type="submit" className="fw-bold px-4">Dodaj urządzenie</Button>
                             </div>
                         </Form>
                     </Modal.Body>
                 </div>
             </Modal>
 
+            {/* Modal dodawania reguły */}
             <Modal show={showRuleModal} onHide={() => setShowRuleModal(false)} centered>
-                <div style={{ backgroundColor: 'var(--card-bg)', color: 'var(--text-main)' }}>
-                    <Modal.Header closeButton closeVariant="white" style={{ borderBottomColor: '#3A475C' }}>
+                <div style={{ backgroundColor: 'var(--card-bg)', color: 'var(--text-main)', borderRadius: '12px', border: '1px solid var(--accent-hover)' }}>
+                    <Modal.Header closeButton closeVariant="white" className="border-secondary">
                         <Modal.Title>Reguła dla: <span style={{ color: 'var(--accent-cyan)' }}>{selectedDevice?.name}</span></Modal.Title>
                     </Modal.Header>
-                    <Modal.Body>
+                    <Modal.Body className="p-4">
                         <Form onSubmit={handleSaveRule}>
                             <Form.Group className="mb-3">
                                 <Form.Label>Nazwa automatyzacji</Form.Label>
@@ -383,25 +394,14 @@ const Devices = () => {
                                 </Form.Select>
                             </Form.Group>
 
-                            <div className="d-flex justify-content-end">
-                                <Button variant="secondary" className="me-2" onClick={() => setShowRuleModal(false)}>Anuluj</Button>
-                                <Button variant="success" type="submit" disabled={sensors.length === 0}>Zapisz i aktywuj</Button>
+                            <div className="d-flex justify-content-end gap-2">
+                                <Button variant="secondary" onClick={() => setShowRuleModal(false)}>Anuluj</Button>
+                                <Button variant="success" type="submit" disabled={sensors.length === 0} className="fw-bold px-4">Zapisz i aktywuj</Button>
                             </div>
                         </Form>
                     </Modal.Body>
                 </div>
             </Modal>
-
-            <ToastContainer position="bottom-end" className="p-3" style={{ zIndex: 9999 }}>
-                <Toast onClose={() => setShowToast(false)} show={showToast} delay={3000} autohide bg={toastVariant}>
-                    <Toast.Header>
-                        <strong className="me-auto">System Automatyzacji</strong>
-                    </Toast.Header>
-                    <Toast.Body className={(toastVariant === 'success' || toastVariant === 'danger' || toastVariant === 'primary') ? 'text-white' : 'text-dark'}>
-                        {toastMessage}
-                    </Toast.Body>
-                </Toast>
-            </ToastContainer>
         </div>
     );
 };

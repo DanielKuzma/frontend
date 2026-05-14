@@ -6,135 +6,129 @@ import api from '../api';
 const Dashboard = () => {
     const navigate = useNavigate();
     const [username] = useState(localStorage.getItem('username') || 'Użytkowniku');
+    const [userRole] = useState(localStorage.getItem('role') || 'RESIDENT'); 
     const [loading, setLoading] = useState(true);
-    const [stats, setStats] = useState({
-        rooms: '-',
-        devices: '-',
-        automations: '-'
-    });
+    const [stats, setStats] = useState({ rooms: '-', devices: '-', automations: '-' });
 
     useEffect(() => {
         const fetchStats = async () => {
             setLoading(true);
-            // Używamy allSettled, aby błąd w jednej statystyce (np. brak uprawnień) 
-            // nie blokował wyświetlania pozostałych
-            const results = await Promise.allSettled([
-                api.get('/rooms'),
-                api.get('/devices'),
-                api.get('/automation/rules')
-            ]);
+            const requests = [api.get('/rooms'), api.get('/devices')];
+            if (userRole !== 'RESIDENT') requests.push(api.get('/automation/rules'));
 
+            const results = await Promise.allSettled(requests);
             setStats({
                 rooms: results[0].status === 'fulfilled' ? results[0].value.data.length : '0',
                 devices: results[1].status === 'fulfilled' ? results[1].value.data.length : '0',
-                automations: results[2].status === 'fulfilled' ? results[2].value.data.length : 'Niedostępne'
+                automations: userRole === 'RESIDENT' ? null : (results[2]?.status === 'fulfilled' ? results[2].value.data.length : '0')
             });
             setLoading(false);
         };
         fetchStats();
-    }, []);
+    }, [userRole]);
 
-    const actionCards = [
-        {
-            title: 'Pokoje i Piętra',
-            desc: 'Monitoruj warunki i steruj oświetleniem w poszczególnych strefach budynku.',
-            link: '/rooms',
-            badge: 'Zarządzanie',
-            variant: 'primary'
-        },
-        {
-            title: 'Inteligentne Reguły',
-            desc: 'Automatyzuj zachowania urządzeń na podstawie odczytów z Twoich czujników.',
-            link: '/automations',
-            badge: 'Logika',
-            variant: 'info'
-        },
-        {
-            title: 'Harmonogramy',
-            desc: 'Zaplanuj cykliczne zadania, aby budynek sam dbał o oszczędność energii.',
-            link: '/schedules',
-            badge: 'Planowanie',
-            variant: 'success'
-        }
-    ];
+    const navModules = [
+        { title: 'Pokoje', desc: 'Zarządzanie strefami', icon: '🚪', path: '/rooms', roles: ['ADMIN', 'BUILDING_MANAGER', 'RESIDENT'] },
+        { title: 'Urządzenia', desc: 'Kontrola sprzętu', icon: '🔌', path: '/devices', roles: ['ADMIN', 'BUILDING_MANAGER', 'RESIDENT'] },
+        { title: 'Czujniki', desc: 'Podgląd odczytów', icon: '🌡️', path: '/sensors', roles: ['ADMIN', 'BUILDING_MANAGER', 'RESIDENT'] },
+        { title: 'Automatyzacje', desc: 'Logika systemu', icon: '⚙️', path: '/automations', roles: ['ADMIN', 'BUILDING_MANAGER'] },
+        { title: 'Harmonogramy', desc: 'Planowanie zadań', icon: '📅', path: '/schedules', roles: ['ADMIN', 'BUILDING_MANAGER'] },
+        { title: 'Logi', desc: 'Historia zdarzeń', icon: '📋', path: '/logs', roles: ['ADMIN', 'BUILDING_MANAGER'] },
+        { title: 'Użytkownicy', desc: 'Uprawnienia', icon: '👥', path: '/users', roles: ['ADMIN'] }
+    ].filter(m => m.roles.includes(userRole));
 
     return (
         <div className="mt-4 container-main-view">
             <div className="main-card-container shadow border-0 p-4">
                 
-                {/* Górna sekcja: Powitanie */}
-                <div className="d-flex justify-content-between align-items-end mb-5">
-                    <div>
-                        <h1 className="fw-bold mb-1" style={{ color: 'var(--accent-cyan)' }}>Dzień dobry, {username}</h1>
-                        <p className="text-muted mb-0" style={{ fontSize: '1.1rem' }}>
-                            Wszystkie systemy budynku są aktywne.
-                        </p>
-                    </div>
-                    <Badge bg="dark" className="border border-secondary px-3 py-2 fw-normal">
-                        Status: Online
-                    </Badge>
+                {/* 1. Nagłówek */}
+                <div className="mb-5">
+                    <h2 className="fw-bold mb-2" style={{ color: 'var(--accent-cyan)' }}>Witaj, {username}</h2>
+                    <p style={{ color: 'var(--text-sub)', fontSize: '1.1rem' }}>Oto aktualny stan budynku.</p>
                 </div>
 
-                {/* Sekcja Statystyk */}
-                <Row className="g-4 mb-5">
-                    {[
-                        { label: 'Pomieszczenia', val: stats.rooms, sub: 'Zarejestrowane jednostki' },
-                        { label: 'Urządzenia', val: stats.devices, sub: 'Aktywne moduły sterujące' },
-                        { label: 'Automatyzacje', val: stats.automations, sub: 'Reguły systemowe' }
-                    ].map((s, i) => (
-                        <Col md={4} key={i}>
-                            <div className="p-4 h-100" style={{ 
-                                backgroundColor: 'rgba(30, 41, 59, 0.5)', 
-                                border: '1px solid #334155', 
-                                borderRadius: '20px' 
-                            }}>
-                                <h6 className="text-uppercase small fw-bold mb-3" style={{ color: 'var(--accent-hover)', letterSpacing: '1px' }}>
-                                    {s.label}
-                                </h6>
-                                <div className="d-flex align-items-baseline gap-2">
-                                    <h2 className="display-4 fw-bold mb-0" style={{ color: '#fff' }}>
-                                        {loading ? <Spinner animation="border" size="sm" /> : s.val}
-                                    </h2>
-                                </div>
-                                <p className="small text-muted mt-2 mb-0">{s.sub}</p>
+                {/* 2. Liczniki statystyk */}
+                <Row className="mb-5 g-4 text-center">
+                    <Col md={userRole === 'RESIDENT' ? 6 : 4}>
+                        <div className="p-3 shadow-sm h-100" style={{ backgroundColor: 'var(--bg-color)', border: '1px solid #334155', borderRadius: '15px' }}>
+                            <h6 className="text-uppercase small fw-bold mb-2" style={{ color: 'var(--text-sub)' }}>Pomieszczenia</h6>
+                            <h2 className="display-5 fw-bold" style={{ color: 'var(--accent-hover)' }}>{loading ? <Spinner size="sm" animation="border" /> : stats.rooms}</h2>
+                        </div>
+                    </Col>
+                    <Col md={userRole === 'RESIDENT' ? 6 : 4}>
+                        <div className="p-3 shadow-sm h-100" style={{ backgroundColor: 'var(--bg-color)', border: '1px solid #334155', borderRadius: '15px' }}>
+                            <h6 className="text-uppercase small fw-bold mb-2" style={{ color: 'var(--text-sub)' }}>Urządzenia</h6>
+                            <h2 className="display-5 fw-bold" style={{ color: 'var(--accent-hover)' }}>{loading ? <Spinner size="sm" animation="border" /> : stats.devices}</h2>
+                        </div>
+                    </Col>
+                    {userRole !== 'RESIDENT' && (
+                        <Col md={4}>
+                            <div className="p-3 shadow-sm h-100" style={{ backgroundColor: 'var(--bg-color)', border: '1px solid #334155', borderRadius: '15px' }}>
+                                <h6 className="text-uppercase small fw-bold mb-2" style={{ color: 'var(--text-sub)' }}>Aktywne Reguły</h6>
+                                <h2 className="display-5 fw-bold" style={{ color: 'var(--accent-hover)' }}>{loading ? <Spinner size="sm" animation="border" /> : stats.automations}</h2>
                             </div>
                         </Col>
-                    ))}
+                    )}
                 </Row>
 
-                <h4 className="mb-4 fw-bold" style={{ color: 'var(--text-main)' }}>Szybki dostęp</h4>
+                {/* 3. Sekcja informacyjna (bez linków) */}
+                <h4 className="mb-4 fw-bold" style={{ color: 'var(--text-main)' }}>O systemie</h4>
+                <Row className="mb-5 g-4">
+                    <Col md={4}>
+                        <Card className="h-100 border-0 p-2 shadow-sm" style={{ backgroundColor: 'rgba(30, 41, 59, 0.3)', border: '1px solid #334155' }}>
+                            <Card.Body>
+                                <Badge bg="primary" className="mb-2">Zarządzanie</Badge>
+                                <h5 className="fw-bold text-white">Pokoje i Piętra</h5>
+                                <Card.Text className="small text-muted">Monitoruj warunki i steruj oświetleniem w poszczególnych strefach budynku.</Card.Text>
+                            </Card.Body>
+                        </Card>
+                    </Col>
+                    <Col md={4}>
+                        <Card className="h-100 border-0 p-2 shadow-sm" style={{ backgroundColor: 'rgba(30, 41, 59, 0.3)', border: '1px solid #334155' }}>
+                            <Card.Body>
+                                <Badge bg="info" className="mb-2 text-dark">Inteligencja</Badge>
+                                <h5 className="fw-bold text-white">Inteligentne Reguły</h5>
+                                <Card.Text className="small text-muted">Automatyzuj zachowania urządzeń na podstawie odczytów z Twoich czujników.</Card.Text>
+                            </Card.Body>
+                        </Card>
+                    </Col>
+                    <Col md={4}>
+                        <Card className="h-100 border-0 p-2 shadow-sm" style={{ backgroundColor: 'rgba(30, 41, 59, 0.3)', border: '1px solid #334155' }}>
+                            <Card.Body>
+                                <Badge bg="success" className="mb-2">Planowanie</Badge>
+                                <h5 className="fw-bold text-white">Harmonogramy</h5>
+                                <Card.Text className="small text-muted">Zaplanuj cykliczne zadania, aby budynek sam dbał o oszczędność energii.</Card.Text>
+                            </Card.Body>
+                        </Card>
+                    </Col>
+                </Row>
 
-                {/* Sekcja Akcji */}
+                <hr style={{ borderColor: '#334155', marginBottom: '40px' }} />
+
+                {/* 4. Nawigacja kafelkowa (Max 3 w rzędzie) */}
+                <h4 className="mb-4 fw-bold" style={{ color: 'var(--text-main)' }}>Menu nawigacyjne</h4>
                 <Row className="g-4">
-                    {actionCards.map((card, i) => (
-                        <Col md={4} key={i}>
+                    {navModules.map((m, i) => (
+                        <Col key={i} xs={12} sm={6} md={4}>
                             <Card 
-                                onClick={() => navigate(card.link)}
-                                className="h-100 border-0 dashboard-action-card p-2" 
-                                style={{ 
-                                    backgroundColor: 'var(--bg-color)', 
-                                    border: '1px solid #334155',
-                                    cursor: 'pointer'
-                                }}
+                                onClick={() => navigate(m.path)}
+                                className="h-100 border-0 nav-tile-card shadow-sm" 
+                                style={{ backgroundColor: 'var(--bg-color)', border: '1px solid #334155', borderRadius: '20px', cursor: 'pointer' }}
                             >
-                                <Card.Body>
-                                    <Badge bg={card.variant} className="mb-3 px-3 py-2 text-dark fw-bold">
-                                        {card.badge}
-                                    </Badge>
-                                    <h5 className="fw-bold mb-3" style={{ color: 'var(--accent-cyan)' }}>
-                                        {card.title}
-                                    </h5>
-                                    <Card.Text style={{ color: 'var(--text-sub)', fontSize: '0.95rem', lineHeight: '1.5' }}>
-                                        {card.desc}
-                                    </Card.Text>
-                                    <div className="mt-3 text-info small fw-bold">
-                                        Przejdź do modułu &rarr;
+                                <Card.Body className="d-flex align-items-center p-4">
+                                    <div className="me-4 d-flex justify-content-center align-items-center shadow-sm" style={{ width: '56px', height: '56px', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: '12px', fontSize: '1.8rem' }}>
+                                        {m.icon}
+                                    </div>
+                                    <div>
+                                        <h5 className="fw-bold mb-1" style={{ color: 'var(--accent-cyan)' }}>{m.title}</h5>
+                                        <p className="mb-0 small text-muted">{m.desc}</p>
                                     </div>
                                 </Card.Body>
                             </Card>
                         </Col>
                     ))}
                 </Row>
+
             </div>
         </div>
     );

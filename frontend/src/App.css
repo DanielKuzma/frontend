@@ -182,3 +182,12 @@
     border-right-color: var(--border);
   }
 }
+
+.nav-tile-card {
+    transition: transform 0.2s ease-in-out, background-color 0.2s ease-in-out;
+}
+.nav-tile-card:hover {
+    transform: translateY(-5px);
+    background-color: #26334d !important;
+    border-color: var(--accent-cyan) !important;
+}

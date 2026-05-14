@@ -2,13 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Row, Col, Card, Spinner, Alert, Button, Modal, Form, Badge } from 'react-bootstrap';
 import api from '../api';
-import { useNotification } from '../NotificationContext'; // <-- Import globalnego hooka
+import { useNotification } from '../NotificationContext';
 
 const Devices = () => {
     const { roomId } = useParams();
     const navigate = useNavigate();
     
-    const [devices, setDevices] = useState([]);
+    const [devices, setDevices] = useState([]); // Urządzenia w obecnym pokoju
+    const [allDevices, setAllDevices] = useState([]); // WSZYSTKIE urządzenia (do walidacji nazwy)
     const [sensors, setSensors] = useState([]); 
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -34,7 +35,6 @@ const Devices = () => {
         targetStatus: 'ON'
     });
 
-    // Wyciągamy funkcję do globalnych powiadomień
     const { showNotification } = useNotification();
 
     useEffect(() => {
@@ -54,12 +54,18 @@ const Devices = () => {
             setUserRole(userResponse.data.role);
             setCurrentUserId(userResponse.data.id); 
 
-            const devicesResponse = await api.get(`/devices/rooms/${roomId}`);
-            setDevices(devicesResponse.data);
+            // Pobieramy urządzenia z pokoju, wszystkie urządzenia oraz czujniki na raz
+            const [roomDevicesRes, allDevicesRes, sensorsRes] = await Promise.all([
+                api.get(`/devices/rooms/${roomId}`),
+                api.get('/devices'),
+                api.get('/sensors')
+            ]);
 
-            const sensorsResponse = await api.get('/sensors');
-            if (Array.isArray(sensorsResponse.data)) {
-                setSensors(sensorsResponse.data);
+            setDevices(roomDevicesRes.data);
+            setAllDevices(allDevicesRes.data);
+            
+            if (Array.isArray(sensorsRes.data)) {
+                setSensors(sensorsRes.data);
             }
             
             setLoading(false);
@@ -71,8 +77,12 @@ const Devices = () => {
 
     const fetchDevicesOnly = async () => {
         try {
-            const response = await api.get(`/devices/rooms/${roomId}`);
-            setDevices(response.data);
+            const [roomDevicesRes, allDevicesRes] = await Promise.all([
+                api.get(`/devices/rooms/${roomId}`),
+                api.get('/devices')
+            ]);
+            setDevices(roomDevicesRes.data);
+            setAllDevices(allDevicesRes.data);
         } catch (err) {
             console.error(err);
         }
@@ -80,6 +90,19 @@ const Devices = () => {
 
     const handleAddDevice = async (e) => {
         e.preventDefault();
+
+        // --- WALIDACJA UNIKALNOŚCI NAZWY ---
+        const cleanNewName = newDevice.name.trim().toLowerCase();
+        
+        const nameExists = allDevices.some(d => d.name.trim().toLowerCase() === cleanNewName);
+
+        if (nameExists) {
+            // Zatrzymujemy wysyłanie formularza i wyświetlamy żółte ostrzeżenie
+            showNotification('Błąd: Urządzenie o takiej nazwie już istnieje w budynku! Użyj unikalnej nazwy (np. "Światło Salon").', 'warning');
+            return; 
+        }
+        // -----------------------------------
+
         try {
             const payload = { ...newDevice, roomId: parseInt(roomId) };
             await api.post('/devices', payload);
@@ -88,10 +111,8 @@ const Devices = () => {
             setNewDevice({ name: '', deviceType: 'LIGHT', deviceStatus: 'OFF', properties: '' });      
             fetchDevicesOnly();
             
-            // Powiadomienie o sukcesie dodania
             showNotification('Pomyślnie dodano nowe urządzenie.', 'success');
         } catch (err) {
-            // Globalne powiadomienie o błędzie zamiast lokalnego alertu/erroru
             showNotification('Wystąpił błąd podczas dodawania urządzenia. Sprawdź uprawnienia.', 'danger');
         }
     };
@@ -110,9 +131,12 @@ const Devices = () => {
     const toggleStatus = async (id, currentStatus) => {
         const nextStatus = (currentStatus === 'ON') ? 'OFF' : 'ON';
         try {
-            await api.patch(`/devices/${id}?deviceStatus=${nextStatus}`);
+            await api.patch(`/devices/${id}?deviceStatus=${nextStatus}&status=${nextStatus}`, {
+                deviceStatus: nextStatus,
+                status: nextStatus
+            });
             fetchDevicesOnly();
-            showNotification(`Zmieniono status urządzenia na ${nextStatus}.`, 'success');
+            showNotification(`Wysłano komendę: ${nextStatus}.`, 'success');
         } catch (err) {
             showNotification('Nie udało się zmienić statusu urządzenia.', 'danger');
         }
@@ -138,12 +162,19 @@ const Devices = () => {
         e.preventDefault();
         try {
             const payload = {
-                ...newRule,
-                targetDeviceId: selectedDevice.id,
-                threshold: parseFloat(newRule.threshold),
+                name: newRule.name,
                 sensorId: parseInt(newRule.sensorId),
+                operator: newRule.operator,
+                threshold: parseFloat(newRule.threshold),
+                targetDeviceId: selectedDevice.id,
                 userId: currentUserId,
-                actionPayload: newRule.targetStatus 
+                
+                actionPayload: newRule.targetStatus,
+                action: newRule.targetStatus,
+                status: newRule.targetStatus,
+                targetStatus: newRule.targetStatus,
+                deviceStatus: newRule.targetStatus,
+                command: newRule.targetStatus
             };
 
             await api.post('/automation/rules', payload);
@@ -163,9 +194,15 @@ const Devices = () => {
             case 'OFF': return 'secondary';
             case 'ERROR': return 'danger';
             case 'OFFLINE': return 'warning';
-            default: return 'secondary';
+            default: return 'danger';
         }
     };
+
+    const availableSensorsForSelectedDevice = sensors.filter(s => {
+        if (!selectedDevice) return false;
+        const sDeviceName = s.deviceName || (s.device && s.device.name);
+        return sDeviceName === selectedDevice.name;
+    });
 
     const canAddDevice = userRole === 'ADMIN' || userRole === 'BUILDING_MANAGER';
     const canDeleteDevice = userRole === 'ADMIN';
@@ -213,8 +250,9 @@ const Devices = () => {
                                             <Card.Title className="fw-bold m-0" style={{ color: 'var(--accent-cyan)', fontSize: '1.25rem' }}>
                                                 {device.name}
                                             </Card.Title>
+                                            
                                             <Badge bg={getStatusBadgeVariant(device.deviceStatus)} className="px-2 py-1">
-                                                {device.deviceStatus}
+                                                {device.deviceStatus || 'BŁĄD DANYCH'}
                                             </Badge>
                                         </div>
                                         
@@ -265,8 +303,8 @@ const Devices = () => {
                     <Modal.Body className="p-4">
                         <Form onSubmit={handleAddDevice}>
                             <Form.Group className="mb-3">
-                                <Form.Label>Nazwa</Form.Label>
-                                <Form.Control type="text" name="name" required value={newDevice.name} onChange={handleChange} />
+                                <Form.Label>Nazwa (Musi być unikalna!)</Form.Label>
+                                <Form.Control type="text" name="name" required value={newDevice.name} onChange={handleChange} style={{ backgroundColor: 'var(--input-bg)', color: 'var(--text-main)' }}/>
                             </Form.Group>
                             
                             <Row>
@@ -300,7 +338,7 @@ const Devices = () => {
 
                             <Form.Group className="mb-4">
                                 <Form.Label>Szczegóły / Konfiguracja (opcjonalnie)</Form.Label>
-                                <Form.Control type="text" name="properties" placeholder="np. MAC: 00:1B:44:11:3A:B7" value={newDevice.properties} onChange={handleChange} />
+                                <Form.Control type="text" name="properties" placeholder="np. MAC: 00:1B:44:11:3A:B7" value={newDevice.properties} onChange={handleChange} style={{ backgroundColor: 'var(--input-bg)', color: 'var(--text-main)' }} />
                             </Form.Group>
 
                             <div className="d-flex justify-content-end gap-2">
@@ -312,7 +350,7 @@ const Devices = () => {
                 </div>
             </Modal>
 
-            {/* Modal dodawania reguły */}
+            {/* Modal dodawania reguły z poziomu urządzenia */}
             <Modal show={showRuleModal} onHide={() => setShowRuleModal(false)} centered>
                 <div style={{ backgroundColor: 'var(--card-bg)', color: 'var(--text-main)', borderRadius: '12px', border: '1px solid var(--accent-hover)' }}>
                     <Modal.Header closeButton closeVariant="white" className="border-secondary">
@@ -327,6 +365,7 @@ const Devices = () => {
                                     placeholder="np. Wyłącz klimatyzację w nocy"
                                     value={newRule.name}
                                     onChange={(e) => setNewRule({ ...newRule, name: e.target.value })}
+                                    style={{ backgroundColor: 'var(--input-bg)', color: 'var(--text-main)' }}
                                 />
                             </Form.Group>
 
@@ -339,12 +378,12 @@ const Devices = () => {
                                     style={{ backgroundColor: 'var(--input-bg)', color: 'var(--text-main)' }}
                                 >
                                     <option value="">-- Wybierz czujnik --</option>
-                                    {sensors.length === 0 ? (
-                                        <option value="" disabled>Brak czujników! Dodaj je najpierw w zakładce Czujniki.</option>
+                                    {availableSensorsForSelectedDevice.length === 0 ? (
+                                        <option value="" disabled>To urządzenie nie posiada przypisanych czujników!</option>
                                     ) : (
-                                        sensors.map(sensor => (
+                                        availableSensorsForSelectedDevice.map(sensor => (
                                             <option key={sensor.id} value={sensor.id}>
-                                                {sensor.name} {sensor.room ? `(${sensor.room.name})` : ''}
+                                                {sensor.name} {sensor.unit ? `(${sensor.unit})` : ''}
                                             </option>
                                         ))
                                     )}
@@ -377,6 +416,7 @@ const Devices = () => {
                                             placeholder="np. 25"
                                             value={newRule.threshold}
                                             onChange={(e) => setNewRule({ ...newRule, threshold: e.target.value })}
+                                            style={{ backgroundColor: 'var(--input-bg)', color: 'var(--text-main)' }}
                                         />
                                     </Form.Group>
                                 </Col>
@@ -396,7 +436,14 @@ const Devices = () => {
 
                             <div className="d-flex justify-content-end gap-2">
                                 <Button variant="secondary" onClick={() => setShowRuleModal(false)}>Anuluj</Button>
-                                <Button variant="success" type="submit" disabled={sensors.length === 0} className="fw-bold px-4">Zapisz i aktywuj</Button>
+                                <Button 
+                                    variant="success" 
+                                    type="submit" 
+                                    disabled={availableSensorsForSelectedDevice.length === 0 || !newRule.name || !newRule.sensorId || !newRule.threshold} 
+                                    className="fw-bold px-4"
+                                >
+                                    Zapisz i aktywuj
+                                </Button>
                             </div>
                         </Form>
                     </Modal.Body>

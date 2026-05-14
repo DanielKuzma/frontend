@@ -1,7 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { Table, Button, Modal, Form, Badge, Card, Spinner } from 'react-bootstrap';
 import api from '../api';
-import { useNotification } from '../NotificationContext'; // <-- Import globalnego hooka
+import { useNotification } from '../NotificationContext';
+
+// NOWY SŁOWNIK: Jakie czujniki pasują do jakich typów urządzeń
+const ALLOWED_SENSORS_FOR_DEVICE = {
+    'LIGHT': ['MOTION'], // Światło reaguje tylko na ruch
+    'HEATER': ['TEMPERATURE'], // Grzejnik tylko na temperaturę
+    'AIR_CONDITIONER': ['TEMPERATURE', 'HUMIDITY'],
+    'FAN': ['TEMPERATURE', 'HUMIDITY'],
+    'BLINDS': ['MOTION', 'DOOR_WINDOW'],
+    'LOCK': ['DOOR_WINDOW'], // Zamek reaguje tylko na otwarcie/zamknięcie
+    'OUTLET': ['TEMPERATURE', 'HUMIDITY', 'MOTION', 'DOOR_WINDOW'], // Inteligentne gniazdko może reagować na wszystko
+    'SPEAKER': ['MOTION', 'DOOR_WINDOW'] // Głośnik jako alarm
+};
 
 const Sensors = () => {
     const [sensors, setSensors] = useState([]);
@@ -10,18 +22,16 @@ const Sensors = () => {
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
     
-    // Wyciągamy funkcję powiadomień
     const { showNotification } = useNotification();
 
     const [newSensor, setNewSensor] = useState({
         name: '',
-        type: '', 
         roomId: '',
         deviceName: '',
+        type: '', 
         unit: ''
     });
 
-    // 1. Pierwsze ładowanie danych (czujniki, pokoje, urządzenia)
     useEffect(() => {
         const loadInitialData = async () => {
             setLoading(true);
@@ -31,13 +41,10 @@ const Sensors = () => {
         loadInitialData();
     }, []);
 
-    // 2. Automatyczne odświeżanie (Polling) co 3 sekundy
     useEffect(() => {
         const intervalId = setInterval(() => {
-            fetchSensors(); // Odświeżamy tylko listę czujników, by widzieć nowe statusy/odczyty
+            fetchSensors();
         }, 3000);
-
-        // Czyszczenie interwału przy wyjściu z komponentu
         return () => clearInterval(intervalId);
     }, []);
 
@@ -76,7 +83,7 @@ const Sensors = () => {
             await api.post('/sensors', newSensor);
             setShowModal(false);
             fetchSensors();
-            setNewSensor({ name: '', type: '', roomId: '', deviceName: '', unit: '' });
+            setNewSensor({ name: '', roomId: '', deviceName: '', type: '', unit: '' });
             
             showNotification("Pomyślnie dodano nowy czujnik!", "success");
         } catch (error) {
@@ -109,8 +116,6 @@ const Sensors = () => {
     const handleGetReading = async (id) => {
         try {
             const response = await api.get(`/sensors/readings/${id}`);
-
-            // Sprawdzamy czy dostaliśmy tablicę odczytów (zgodnie z poprawką w Java List<SensorReading>)
             if (Array.isArray(response.data) && response.data.length > 0) {
                 const latest = response.data[response.data.length - 1];
                 showNotification(`Najnowszy odczyt: ${latest.value !== null ? latest.value : latest.valueText}`, "info");
@@ -123,11 +128,19 @@ const Sensors = () => {
         }
     };
 
+    // Logika wyciągania typu dla wybranego urządzenia
+    const selectedDeviceObj = devices.find(d => 
+        d.name === newSensor.deviceName && 
+        d.room?.id.toString() === newSensor.roomId.toString()
+    );
+    const selectedDeviceType = selectedDeviceObj ? selectedDeviceObj.deviceType : null;
+    const allowedSensors = selectedDeviceType ? ALLOWED_SENSORS_FOR_DEVICE[selectedDeviceType] || [] : [];
+
     if (loading) return <Spinner animation="border" style={{ color: 'var(--accent-cyan)' }} className="d-block mx-auto mt-5" />;
 
     return (
         <div className="mt-4 container-main-view">
-            <div className="main-card-container shadow border-0">
+            <div className="main-card-container shadow border-0 p-4">
                 <div className="d-flex justify-content-between align-items-center mb-4">
                     <h2 className="section-title mb-0" style={{ color: 'var(--accent-cyan)' }}>Zarządzanie Czujnikami</h2>
                     <Button variant="primary" onClick={() => setShowModal(true)}>
@@ -163,7 +176,7 @@ const Sensors = () => {
                                 <td className="text-center"><Badge bg="secondary">{sensor.unit}</Badge></td>
                                 <td className="text-center">
                                     {sensor.enabled ? (
-                                        <Badge bg="success">Włączony (Aktywny)</Badge>
+                                        <Badge bg="success">Włączony</Badge>
                                     ) : (
                                         <Badge bg="danger">Wyłączony</Badge>
                                     )}
@@ -200,6 +213,8 @@ const Sensors = () => {
                     </Modal.Header>
                     <Modal.Body className="p-4">
                         <Form onSubmit={handleAddSensor}>
+                            
+                            {/* KROK 1: NAZWA */}
                             <Form.Group className="mb-3">
                                 <Form.Label>Nazwa Czujnika</Form.Label>
                                 <Form.Control 
@@ -211,7 +226,56 @@ const Sensors = () => {
                                     style={{ backgroundColor: 'var(--input-bg)', color: 'var(--text-main)', border: '1px solid #334155' }}
                                 />
                             </Form.Group>
-                            
+
+                            {/* KROK 2: POKÓJ */}
+                            <Form.Group className="mb-3">
+                                <Form.Label>Pokój</Form.Label>
+                                <Form.Select 
+                                    required 
+                                    value={newSensor.roomId} 
+                                    onChange={(e) => setNewSensor({
+                                        ...newSensor, 
+                                        roomId: e.target.value, 
+                                        deviceName: '', // Reset przy zmianie pokoju
+                                        type: '', 
+                                        unit: ''
+                                    })}
+                                    style={{ backgroundColor: 'var(--input-bg)', color: 'var(--text-main)', border: '1px solid #334155' }}
+                                >
+                                    <option value="">-- Wybierz pokój --</option>
+                                    {rooms.map(room => (
+                                        <option key={room.id} value={room.id}>{room.name}</option>
+                                    ))}
+                                </Form.Select>
+                            </Form.Group>
+
+                            {/* KROK 3: URZĄDZENIE */}
+                            <Form.Group className="mb-3">
+                                <Form.Label>Powiązane Urządzenie</Form.Label>
+                                <Form.Select 
+                                    required 
+                                    value={newSensor.deviceName} 
+                                    onChange={(e) => setNewSensor({
+                                        ...newSensor, 
+                                        deviceName: e.target.value,
+                                        type: '', // Reset przy zmianie urządzenia
+                                        unit: ''
+                                    })}
+                                    disabled={!newSensor.roomId}
+                                    style={{ backgroundColor: 'var(--input-bg)', color: 'var(--text-main)', border: '1px solid #334155' }}
+                                >
+                                    <option value="">-- Wybierz urządzenie --</option>
+                                    {devices
+                                        .filter(d => d.room && d.room.id.toString() === newSensor.roomId.toString())
+                                        .map(d => (
+                                            <option key={d.id} value={d.name}>{d.name} ({d.deviceType})</option>
+                                        ))
+                                    }
+                                </Form.Select>
+                                {!newSensor.roomId && <Form.Text className="text-muted">Wybierz pokój, aby zobaczyć dostępne urządzenia.</Form.Text>}
+                            </Form.Group>
+
+                            {/* KROK 4: TYP DZIAŁANIA (Filtrowany kaskadowo) */}
                             <Form.Group className="mb-3">
                                 <Form.Label>Typ działania</Form.Label>
                                 <Form.Select 
@@ -226,50 +290,26 @@ const Sensors = () => {
                                         else if (val === 'DOOR_WINDOW') unit = 'LOCK/UNLOCK';
                                         setNewSensor({...newSensor, type: val, unit: unit});
                                     }}
+                                    disabled={!newSensor.deviceName}
                                     style={{ backgroundColor: 'var(--input-bg)', color: 'var(--text-main)', border: '1px solid #334155' }}
                                 >
                                     <option value="">-- Wybierz typ --</option>
-                                    <option value="TEMPERATURE">Temperatura (°C)</option>
-                                    <option value="HUMIDITY">Wilgotność (%)</option>
-                                    <option value="MOTION">Ruch (ON/OFF)</option>
-                                    <option value="DOOR_WINDOW">Otwarcie (LOCK/UNLOCK)</option>
+                                    
+                                    {/* Renderowanie tylko dozwolonych opcji dla wybranego urządzenia */}
+                                    {allowedSensors.includes('TEMPERATURE') && <option value="TEMPERATURE">Temperatura (°C)</option>}
+                                    {allowedSensors.includes('HUMIDITY') && <option value="HUMIDITY">Wilgotność (%)</option>}
+                                    {allowedSensors.includes('MOTION') && <option value="MOTION">Ruch (ON/OFF)</option>}
+                                    {allowedSensors.includes('DOOR_WINDOW') && <option value="DOOR_WINDOW">Otwarcie (LOCK/UNLOCK)</option>}
+                                    
+                                    {/* Komunikat, jeśli urządzenie nie wspiera żadnych zaimplementowanych czujników */}
+                                    {newSensor.deviceName && allowedSensors.length === 0 && (
+                                        <option value="" disabled>To urządzenie nie wspiera czujników</option>
+                                    )}
                                 </Form.Select>
+                                {!newSensor.deviceName && newSensor.roomId && <Form.Text className="text-muted">Wybierz urządzenie, aby dopasować czujnik.</Form.Text>}
                             </Form.Group>
 
-                            <Form.Group className="mb-3">
-                                <Form.Label>Pokój</Form.Label>
-                                <Form.Select 
-                                    required 
-                                    value={newSensor.roomId} 
-                                    onChange={(e) => setNewSensor({...newSensor, roomId: e.target.value, deviceName: ''})}
-                                    style={{ backgroundColor: 'var(--input-bg)', color: 'var(--text-main)', border: '1px solid #334155' }}
-                                >
-                                    <option value="">-- Wybierz pokój --</option>
-                                    {rooms.map(room => (
-                                        <option key={room.id} value={room.id}>{room.name}</option>
-                                    ))}
-                                </Form.Select>
-                            </Form.Group>
-
-                            <Form.Group className="mb-3">
-                                <Form.Label>Powiązane Urządzenie (w wybranym pokoju)</Form.Label>
-                                <Form.Select 
-                                    required 
-                                    value={newSensor.deviceName} 
-                                    onChange={(e) => setNewSensor({...newSensor, deviceName: e.target.value})}
-                                    disabled={!newSensor.roomId}
-                                    style={{ backgroundColor: 'var(--input-bg)', color: 'var(--text-main)', border: '1px solid #334155' }}
-                                >
-                                    <option value="">-- Wybierz urządzenie --</option>
-                                    {devices
-                                        .filter(d => d.room && d.room.id.toString() === newSensor.roomId.toString())
-                                        .map(d => (
-                                            <option key={d.id} value={d.name}>{d.name} ({d.deviceType})</option>
-                                        ))
-                                    }
-                                </Form.Select>
-                            </Form.Group>
-
+                            {/* KROK 5: JEDNOSTKA */}
                             <Form.Group className="mb-4">
                                 <Form.Label>Jednostka (przypisana automatycznie)</Form.Label>
                                 <Form.Control 
@@ -286,7 +326,7 @@ const Sensors = () => {
                                     variant="primary" 
                                     type="submit" 
                                     className="fw-bold px-4" 
-                                    disabled={!newSensor.name || !newSensor.type || !newSensor.roomId || !newSensor.deviceName}
+                                    disabled={!newSensor.name || !newSensor.roomId || !newSensor.deviceName || !newSensor.type}
                                 >
                                     Zapisz Czujnik
                                 </Button>

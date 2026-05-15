@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Spinner, Alert, Badge, Card, Form, InputGroup } from 'react-bootstrap';
+import { Table, Spinner, Alert, Badge, Card, Form, InputGroup, Row, Col } from 'react-bootstrap';
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import api from '../api';
-import { useNotification } from '../NotificationContext'; // <-- Import globalnego hooka
+import { useNotification } from '../NotificationContext';
 
 const ExpandableText = ({ text }) => {
     const [isExpanded, setIsExpanded] = useState(false);
@@ -43,7 +44,7 @@ const EventLogs = () => {
     const [error, setError] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
 
-    const { showNotification } = useNotification(); // <-- Wyciągamy funkcję powiadomień
+    const { showNotification } = useNotification();
 
     useEffect(() => {
         fetchLogs();
@@ -59,7 +60,6 @@ const EventLogs = () => {
             console.error(err);
             setError('Błąd pobierania logów. Sprawdź, czy ścieżka API jest poprawna.');
             setLoading(false);
-            // Globalne powiadomienie o błędzie ładowania
             showNotification('Nie udało się załadować dziennika zdarzeń.', 'danger');
         }
     };
@@ -107,12 +107,45 @@ const EventLogs = () => {
         boxShadow: '0 2px 4px rgba(0,0,0,0.5)'
     };
 
+    // --- DYNAMICZNE WYLICZANIE DANYCH DO WYKRESÓW ---
+    
+    // 1. Wyliczenia dla poziomu logów (Typ)
+    const infoCount = logs.filter(l => l.logType === 'INFO').length;
+    const warningCount = logs.filter(l => l.logType === 'WARNING').length;
+    const errorCount = logs.filter(l => l.logType === 'ERROR').length;
+
+    const logTypeStats = [
+        { name: 'INFO', value: infoCount, color: '#0dcaf0' },
+        { name: 'WARNING', value: warningCount, color: '#ffc107' },
+        { name: 'ERROR', value: errorCount, color: '#dc3545' }
+    ].filter(stat => stat.value > 0);
+
+    // 2. Wyliczenia dla źródła logów
+    const userCount = logs.filter(l => l.source === 'USER').length;
+    const autoCount = logs.filter(l => l.source === 'AUTOMATION').length;
+    const scheduleCount = logs.filter(l => l.source === 'SCHEDULE').length;
+    const sensorCount = logs.filter(l => l.source === 'SENSOR').length;
+    const deviceCount = logs.filter(l => l.source === 'DEVICE').length;
+    const systemCount = logs.filter(l => l.source === 'SYSTEM').length;
+    const otherCount = logs.length - (userCount + autoCount + scheduleCount + sensorCount + deviceCount + systemCount);
+
+    const logSourceStats = [
+        { name: 'Użytkownik', value: userCount, color: '#0d6efd' }, // Primary
+        { name: 'Automatyzacja', value: autoCount, color: '#6f42c1' }, // Purple
+        { name: 'Harmonogram', value: scheduleCount, color: '#198754' }, // Success
+        { name: 'Czujnik', value: sensorCount, color: '#20c997' }, // Teal
+        { name: 'Urządzenie', value: deviceCount, color: '#adb5bd' }, // Secondary
+        { name: 'System', value: systemCount, color: '#f8f9fa' }, // Light/Dark
+        { name: 'Inne', value: otherCount, color: '#6c757d' }
+    ].filter(stat => stat.value > 0);
+
+
     if (loading) return <Spinner animation="border" style={{ color: 'var(--accent-cyan)' }} className="d-block mx-auto mt-5" />;
     if (error) return <Alert variant="danger" className="mt-4 container-main-view">{error}</Alert>;
 
     return (
         <div className="mt-4 container-main-view">
-            <div className="main-card-container shadow border-0">
+            <div className="main-card-container shadow border-0 p-4">
                 <h2 className="section-title mb-4" style={{ color: 'var(--accent-cyan)' }}>
                     Dziennik Zdarzeń
                 </h2>
@@ -134,7 +167,7 @@ const EventLogs = () => {
                     <Alert variant="info" className="m-0">Dziennik jest pusty lub nic nie pasuje do wyszukiwania.</Alert>
                 ) : (
                     <Card className="shadow border-0 overflow-hidden">
-                        <div style={{ maxHeight: '60vh', overflow: 'auto' }} className="custom-scrollbar">
+                        <div style={{ maxHeight: '55vh', overflow: 'auto' }} className="custom-scrollbar">
                             <Table striped bordered hover variant="dark" className="m-0 align-middle" size="sm">
                                 <thead>
                                     <tr className="text-center">
@@ -194,6 +227,56 @@ const EventLogs = () => {
                         </div>
                     </Card>
                 )}
+
+                {/* --- NOWA SEKCJA Z WYKRESAMI --- */}
+                {logs.length > 0 && (
+                    <Row className="mt-5 g-4">
+                        {/* Wykres Typu (Poziomu) Logów */}
+                        <Col lg={6}>
+                            <div className="p-4 h-100 d-flex flex-column" style={{ backgroundColor: 'rgba(30, 41, 59, 0.3)', borderRadius: '15px', border: '1px solid #334155' }}>
+                                <h5 className="fw-bold text-white mb-1">Poziom Zdarzeń</h5>
+                                <p className="text-muted small mb-4">Stosunek poprawnych operacji do błędów systemu.</p>
+                                
+                                <div style={{ width: '100%', height: 250 }} className="mt-auto">
+                                    <ResponsiveContainer>
+                                        <PieChart>
+                                            <Pie data={logTypeStats} innerRadius={60} outerRadius={90} paddingAngle={5} dataKey="value" stroke="none">
+                                                {logTypeStats.map((entry, index) => (
+                                                    <Cell key={`cell-${index}`} fill={entry.color} />
+                                                ))}
+                                            </Pie>
+                                            <Tooltip contentStyle={{ backgroundColor: 'var(--card-bg)', border: '1px solid #334155', borderRadius: '8px' }} />
+                                            <Legend verticalAlign="bottom" height={36} iconType="circle" />
+                                        </PieChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            </div>
+                        </Col>
+
+                        {/* Wykres Źródła Logów */}
+                        <Col lg={6}>
+                            <div className="p-4 h-100 d-flex flex-column" style={{ backgroundColor: 'rgba(30, 41, 59, 0.3)', borderRadius: '15px', border: '1px solid #334155' }}>
+                                <h5 className="fw-bold text-white mb-1">Źródło Zdarzeń</h5>
+                                <p className="text-muted small mb-4">Kto lub co wygenerowało akcje w systemie (aktywność na żywo).</p>
+                                
+                                <div style={{ width: '100%', height: 250 }} className="mt-auto">
+                                    <ResponsiveContainer>
+                                        <PieChart>
+                                            <Pie data={logSourceStats} innerRadius={60} outerRadius={90} paddingAngle={5} dataKey="value" stroke="none">
+                                                {logSourceStats.map((entry, index) => (
+                                                    <Cell key={`cell-${index}`} fill={entry.color} />
+                                                ))}
+                                            </Pie>
+                                            <Tooltip contentStyle={{ backgroundColor: 'var(--card-bg)', border: '1px solid #334155', borderRadius: '8px' }} />
+                                            <Legend verticalAlign="bottom" height={36} iconType="circle" />
+                                        </PieChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            </div>
+                        </Col>
+                    </Row>
+                )}
+
             </div>
         </div>
     );

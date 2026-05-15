@@ -11,11 +11,14 @@ const Rooms = () => {
     const [error, setError] = useState('');
     const [userRole, setUserRole] = useState(''); 
     const [showModal, setShowModal] = useState(false);
+    
+    // NOWE: Stan dla modala potwierdzającego usunięcie
+    const [deleteConfirmInfo, setDeleteConfirmInfo] = useState({ show: false, id: null });
+
     const [newRoom, setNewRoom] = useState({
         name: '', description: '', floor: 0, areaInSquareM: 0.0
     });
     
-    // Zastępujemy lokalny actionError hookiem powiadomień
     const { showNotification } = useNotification();
 
     useEffect(() => {
@@ -59,7 +62,6 @@ const Rooms = () => {
             fetchRoomsOnly();            
             showNotification('Pomyślnie dodano nowe pomieszczenie.', 'success');
         } catch (err) {
-            // OBSŁUGA BŁĘDU 409
             if (err.response && err.response.status === 409) {
                 showNotification('Pomieszczenie o takiej nazwie już istnieje! Wybierz inną.', 'warning');
             } else {
@@ -68,14 +70,17 @@ const Rooms = () => {
         }
     };
 
-    const handleDeleteRoom = async (id) => {
-        if (!window.confirm('Czy na pewno chcesz usunąć ten pokój?')) return;
+    // ZMODYFIKOWANA FUNKCJA: Teraz tylko wysyła żądanie po potwierdzeniu w modalu
+    const executeDeleteRoom = async () => {
+        if (!deleteConfirmInfo.id) return;
         try {
-            await api.delete(`/rooms/${id}`);
+            await api.delete(`/rooms/${deleteConfirmInfo.id}`);
             fetchRoomsOnly();
             showNotification('Pomieszczenie zostało pomyślnie usunięte.', 'success');
         } catch (err) {
             showNotification('Wystąpił błąd podczas usuwania pokoju.', 'danger');
+        } finally {
+            setDeleteConfirmInfo({ show: false, id: null });
         }
     };
 
@@ -91,7 +96,6 @@ const Rooms = () => {
 
     return (
         <div className="mt-4 container-main-view">
-            {/* GŁÓWNA KARTA OPAKOWUJĄCA */}
             <div className="main-card-container shadow border-0 p-4">
                 <div className="d-flex justify-content-between align-items-center mb-4">
                     <h2 className="section-title mb-0">Zarządzanie Pomieszczeniami</h2>
@@ -141,7 +145,7 @@ const Rooms = () => {
                                                 <Button 
                                                     variant="outline-danger" 
                                                     size="sm" 
-                                                    onClick={() => handleDeleteRoom(room.id)}
+                                                    onClick={() => setDeleteConfirmInfo({ show: true, id: room.id })}
                                                 >
                                                     Usuń
                                                 </Button>
@@ -165,23 +169,36 @@ const Rooms = () => {
                         <Form onSubmit={handleAddRoom}>
                             <Form.Group className="mb-3">
                                 <Form.Label>Nazwa pokoju</Form.Label>
-                                <Form.Control type="text" name="name" placeholder="np. Salon..." required value={newRoom.name} onChange={handleChange} />
+                                <Form.Control 
+                                    type="text" name="name" placeholder="np. Salon..." 
+                                    required value={newRoom.name} onChange={handleChange} 
+                                    style={{ backgroundColor: 'var(--input-bg)', color: 'var(--text-main)', border: '1px solid #334155' }}
+                                />
                             </Form.Group>
                             <Form.Group className="mb-3">
                                 <Form.Label>Opis (opcjonalnie)</Form.Label>
-                                <Form.Control as="textarea" rows={2} name="description" value={newRoom.description} onChange={handleChange} />
+                                <Form.Control 
+                                    as="textarea" rows={2} name="description" value={newRoom.description} onChange={handleChange} 
+                                    style={{ backgroundColor: 'var(--input-bg)', color: 'var(--text-main)', border: '1px solid #334155' }}
+                                />
                             </Form.Group>
                             <Row>
                                 <Col>
                                     <Form.Group className="mb-4">
                                         <Form.Label>Piętro</Form.Label>
-                                        <Form.Control type="number" name="floor" required value={newRoom.floor} onChange={handleChange} />
+                                        <Form.Control 
+                                            type="number" name="floor" required value={newRoom.floor} onChange={handleChange} 
+                                            style={{ backgroundColor: 'var(--input-bg)', color: 'var(--text-main)', border: '1px solid #334155' }}
+                                        />
                                     </Form.Group>
                                 </Col>
                                 <Col>
                                     <Form.Group className="mb-4">
                                         <Form.Label>Powierzchnia (m²)</Form.Label>
-                                        <Form.Control type="number" step="0.1" name="areaInSquareM" required value={newRoom.areaInSquareM} onChange={handleChange} />
+                                        <Form.Control 
+                                            type="number" step="0.1" name="areaInSquareM" required value={newRoom.areaInSquareM} onChange={handleChange} 
+                                            style={{ backgroundColor: 'var(--input-bg)', color: 'var(--text-main)', border: '1px solid #334155' }}
+                                        />
                                     </Form.Group>
                                 </Col>
                             </Row>
@@ -190,6 +207,29 @@ const Rooms = () => {
                                 <Button variant="primary" type="submit" className="fw-bold px-4">Zapisz pokój</Button>
                             </div>
                         </Form>
+                    </Modal.Body>
+                </div>
+            </Modal>
+
+            {/* MODAL POTWIERDZENIA USUNIĘCIA */}
+            <Modal show={deleteConfirmInfo.show} onHide={() => setDeleteConfirmInfo({ show: false, id: null })} centered size="sm">
+                <div style={{ backgroundColor: 'var(--card-bg)', color: 'var(--text-main)', borderRadius: '12px', border: '1px solid var(--accent-hover)' }}>
+                    <Modal.Body className="p-4 text-center">
+                        <div className="mb-3">
+                            <span style={{ fontSize: '3rem' }}>⚠️</span>
+                        </div>
+                        <h5 className="fw-bold mb-3 text-danger">Usuń pomieszczenie</h5>
+                        <p className="text-muted" style={{ fontSize: '0.95rem' }}>
+                            Czy na pewno chcesz usunąć ten pokój? Usunięcie pokoju może wpłynąć na przypisane do niego urządzenia.
+                        </p>
+                        <div className="d-flex justify-content-center gap-2 mt-4">
+                            <Button variant="secondary" onClick={() => setDeleteConfirmInfo({ show: false, id: null })}>
+                                Anuluj
+                            </Button>
+                            <Button variant="danger" className="fw-bold" onClick={executeDeleteRoom}>
+                                Tak, usuń
+                            </Button>
+                        </div>
                     </Modal.Body>
                 </div>
             </Modal>

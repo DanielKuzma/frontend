@@ -20,6 +20,7 @@ import Automations from './components/Automations';
 import Schedules from './components/Schedules';
 import EventLogs from './components/EventLogs';
 import Users from './components/Users';
+import SensorChart from './components/SensorChart';
 
 // IMPORT KONTEKSTU POWIADOMIEŃ
 import { NotificationProvider } from './NotificationContext';
@@ -60,6 +61,7 @@ function App() {
                                 <Route path="/logs" element={<EventLogs />} />
                                 <Route path="/users" element={<Users />} />
                                 
+                                <Route path="/sensors/:id/chart" element={<SensorChart />} />
                                 <Route path="*" element={<Navigate to="/" />} />
                             </Route>
                         )}

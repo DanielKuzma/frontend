@@ -13,6 +13,10 @@ const Automations = () => {
     const [error, setError] = useState('');
     
     const [showModal, setShowModal] = useState(false);
+    
+    // --- NOWY STAN DLA POTWIERDZENIA USUNIĘCIA ---
+    const [deleteConfirmInfo, setDeleteConfirmInfo] = useState({ show: false, id: null });
+
     const [newRule, setNewRule] = useState({
         name: '',
         roomId: '', 
@@ -71,14 +75,17 @@ const Automations = () => {
         }
     };
 
-    const handleDeleteRule = async (id) => {
-        if (!window.confirm('Na pewno usunąć tę automatyzację?')) return;
+    // --- ZMODYFIKOWANA FUNKCJA: TYLKO WYWOŁANIE API PO POTWIERDZENIU ---
+    const executeDeleteRule = async () => {
+        if (!deleteConfirmInfo.id) return;
         try {
-            await api.delete(`/automation/rules/${id}`);
+            await api.delete(`/automation/rules/${deleteConfirmInfo.id}`);
             fetchRulesOnly();
             showNotification('Pomyślnie usunięto regułę automatyzacji.', 'success');
         } catch (err) {
             showNotification('Błąd podczas usuwania reguły.', 'danger');
+        } finally {
+            setDeleteConfirmInfo({ show: false, id: null });
         }
     };
 
@@ -211,7 +218,8 @@ const Automations = () => {
                                                 {rule.enabled ? 'Uśpij' : 'Wznów'}
                                             </Button>
                                             
-                                            <Button variant="outline-danger" size="sm" onClick={() => handleDeleteRule(rule.id)}>
+                                            {/* --- PODMIANA: Otwieramy modal zamiast alertu --- */}
+                                            <Button variant="outline-danger" size="sm" onClick={() => setDeleteConfirmInfo({ show: true, id: rule.id })}>
                                                 Usuń
                                             </Button>
                                         </td>
@@ -365,6 +373,30 @@ const Automations = () => {
                     </Modal.Body>
                 </div>
             </Modal>
+
+            {/* --- NOWY MODAL POTWIERDZENIA USUNIĘCIA --- */}
+            <Modal show={deleteConfirmInfo.show} onHide={() => setDeleteConfirmInfo({ show: false, id: null })} centered size="sm">
+                <div style={{ backgroundColor: 'var(--card-bg)', color: 'var(--text-main)', borderRadius: '12px', border: '1px solid var(--accent-hover)' }}>
+                    <Modal.Body className="p-4 text-center">
+                        <div className="mb-3">
+                            <span style={{ fontSize: '3rem' }}>⚠️</span>
+                        </div>
+                        <h5 className="fw-bold mb-3 text-danger">Usuń automatyzację</h5>
+                        <p className="text-muted" style={{ fontSize: '0.95rem' }}>
+                            Czy na pewno chcesz usunąć tę regułę? System przestanie automatycznie sterować tym urządzeniem.
+                        </p>
+                        <div className="d-flex justify-content-center gap-2 mt-4">
+                            <Button variant="secondary" onClick={() => setDeleteConfirmInfo({ show: false, id: null })}>
+                                Anuluj
+                            </Button>
+                            <Button variant="danger" className="fw-bold" onClick={executeDeleteRule}>
+                                Tak, usuń
+                            </Button>
+                        </div>
+                    </Modal.Body>
+                </div>
+            </Modal>
+
         </div>
     );
 };

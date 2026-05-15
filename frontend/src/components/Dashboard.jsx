@@ -41,13 +41,41 @@ const Dashboard = () => {
         <div className="mt-4 container-main-view">
             <div className="main-card-container shadow border-0 p-4">
                 
-                {/* 1. Nagłówek */}
+                {/* 1. Powitanie */}
                 <div className="mb-5">
                     <h2 className="fw-bold mb-2" style={{ color: 'var(--accent-cyan)' }}>Witaj, {username}</h2>
-                    <p style={{ color: 'var(--text-sub)', fontSize: '1.1rem' }}>Oto aktualny stan budynku.</p>
                 </div>
 
-                {/* 2. Liczniki statystyk */}
+                {/* 2. Nawigacja kafelkowa (Menu) */}
+                <h4 className="mb-4 fw-bold" style={{ color: 'var(--text-main)' }}>Menu nawigacyjne</h4>
+                <Row className="g-4 mb-5">
+                    {navModules.map((m, i) => (
+                        <Col key={i} xs={12} sm={6} md={4}>
+                            <Card 
+                                onClick={() => navigate(m.path)}
+                                className="h-100 border-0 nav-tile-card shadow-sm" 
+                                style={{ backgroundColor: 'var(--bg-color)', border: '1px solid #334155', borderRadius: '20px', cursor: 'pointer' }}
+                            >
+                                <Card.Body className="d-flex align-items-center p-4">
+                                    <div className="me-4 d-flex justify-content-center align-items-center shadow-sm" style={{ width: '56px', height: '56px', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: '12px', fontSize: '1.8rem' }}>
+                                        {m.icon}
+                                    </div>
+                                    <div>
+                                        <h5 className="fw-bold mb-1" style={{ color: 'var(--accent-cyan)' }}>{m.title}</h5>
+                                        <p className="mb-0 small text-muted">{m.desc}</p>
+                                    </div>
+                                </Card.Body>
+                            </Card>
+                        </Col>
+                    ))}
+                </Row>
+
+                <hr style={{ borderColor: '#334155', marginBottom: '40px' }} />
+
+                {/* 3. Nagłówek statystyk i Liczniki */}
+                <div className="mb-4">
+                    <h4 className="fw-bold" style={{ color: 'var(--text-main)' }}>Oto aktualny stan budynku</h4>
+                </div>
                 <Row className="mb-5 g-4 text-center">
                     <Col md={userRole === 'RESIDENT' ? 6 : 4}>
                         <div className="p-3 shadow-sm h-100" style={{ backgroundColor: 'var(--bg-color)', border: '1px solid #334155', borderRadius: '15px' }}>
@@ -71,9 +99,11 @@ const Dashboard = () => {
                     )}
                 </Row>
 
-                {/* 3. Sekcja informacyjna (bez linków) */}
+                <hr style={{ borderColor: '#334155', marginBottom: '40px' }} />
+
+                {/* 4. Sekcja informacyjna */}
                 <h4 className="mb-4 fw-bold" style={{ color: 'var(--text-main)' }}>O systemie</h4>
-                <Row className="mb-5 g-4">
+                <Row className="mb-2 g-4">
                     <Col md={4}>
                         <Card className="h-100 border-0 p-2 shadow-sm" style={{ backgroundColor: 'rgba(30, 41, 59, 0.3)', border: '1px solid #334155' }}>
                             <Card.Body>
@@ -103,35 +133,11 @@ const Dashboard = () => {
                     </Col>
                 </Row>
 
-                <hr style={{ borderColor: '#334155', marginBottom: '40px' }} />
-
-                {/* 4. Nawigacja kafelkowa (Max 3 w rzędzie) */}
-                <h4 className="mb-4 fw-bold" style={{ color: 'var(--text-main)' }}>Menu nawigacyjne</h4>
-                <Row className="g-4">
-                    {navModules.map((m, i) => (
-                        <Col key={i} xs={12} sm={6} md={4}>
-                            <Card 
-                                onClick={() => navigate(m.path)}
-                                className="h-100 border-0 nav-tile-card shadow-sm" 
-                                style={{ backgroundColor: 'var(--bg-color)', border: '1px solid #334155', borderRadius: '20px', cursor: 'pointer' }}
-                            >
-                                <Card.Body className="d-flex align-items-center p-4">
-                                    <div className="me-4 d-flex justify-content-center align-items-center shadow-sm" style={{ width: '56px', height: '56px', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: '12px', fontSize: '1.8rem' }}>
-                                        {m.icon}
-                                    </div>
-                                    <div>
-                                        <h5 className="fw-bold mb-1" style={{ color: 'var(--accent-cyan)' }}>{m.title}</h5>
-                                        <p className="mb-0 small text-muted">{m.desc}</p>
-                                    </div>
-                                </Card.Body>
-                            </Card>
-                        </Col>
-                    ))}
-                </Row>
-
             </div>
         </div>
     );
 };
 
 export default Dashboard;
+
+// wykresy 
